@@ -1,0 +1,27 @@
+# Step 0 (temporary): checks which market-data providers answer from GitHub's servers.
+name: provider-check
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe providers
+        run: |
+          probe() { code=$(curl -s -o body.txt -w '%{http_code}' -m 20 "$2"); echo "$code  $1"; head -c 300 body.txt; echo; echo; }
+          probe "binance api.binance.com klines"        "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=2"
+          probe "binance data-api.binance.vision klines" "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=2"
+          probe "binance data-api 1000 daily candles"    "https://data-api.binance.vision/api/v3/klines?symbol=HBARUSDT&interval=1d&limit=1000"
+          probe "coinbase BTC-USD daily"                 "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400"
+          probe "coingecko market_chart 400d"            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=400&interval=daily"
+          probe "coingecko market_chart 365d"            "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily"
+          probe "kraken HBAR daily"                      "https://api.kraken.com/0/public/OHLC?pair=HBARUSD&interval=1440"
+          probe "okx BTC-USDT daily"                     "https://www.okx.com/api/v5/market/history-candles?instId=BTC-USDT&bar=1Dutc&limit=2"
+          echo "--- Binance candle count per pair (data-api) ---"
+          for p in BTC ETH SOL ADA XLM XRP ALGO HBAR LINK; do
+            n=$(curl -s -m 20 "https://data-api.binance.vision/api/v3/klines?symbol=${p}USDT&interval=1d&limit=1000" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else d)" 2>&1)
+            echo "${p}USDT: $n"
+          done
+          echo "--- Coinbase pairs ---"
+          for p in BTC ETH SOL ADA XLM XRP ALGO HBAR LINK; do
+            echo "$(curl -s -o /dev/null -w '%{http_code}' -m 20 "https://api.exchange.coinbase.com/products/${p}-USD/ticker")  ${p}-USD"
+          done

@@ -1,0 +1,14 @@
+# Secrets — never commit
+config/keys.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node / editors / OS
+node_modules/
+.vscode/
+.DS_Store
+Thumbs.db
