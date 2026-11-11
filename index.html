@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crypto Signal Monitor</title>
+  <meta name="description" content="Live crypto prices with rule-based BUY / HOLD / SELL signals. Information only, not financial advice.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1l7 7-7 7-7-7z' fill='%233B82F6'/%3E%3C/svg%3E">
+  <script>
+    // Apply the remembered theme before the page paints, so it never flashes.
+    try { var t = localStorage.getItem("csm.theme"); if (t) document.documentElement.dataset.theme = JSON.parse(t); } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="header" id="header">
+    <h1 class="brand"><span class="logo" aria-hidden="true">&#9670;</span> <a href="#/" style="color:inherit">Crypto Signal Monitor</a></h1>
+    <button class="btn menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="header-controls">&#9776; Menu</button>
+
+    <div class="controls collapsible" id="header-controls">
+      <label for="refresh-select">Refresh</label>
+      <select class="btn" id="refresh-select" aria-label="Refresh interval"></select>
+      <button class="btn" id="pause-btn" aria-pressed="false">&#10074;&#10074; Pause</button>
+      <button class="btn primary" id="refresh-btn">&#8635; Refresh now</button>
+      <div class="status" role="status" aria-live="polite">
+        <span class="dot" id="status-dot"></span>
+        <span class="state" id="status-text">Connecting…</span>
+        <span class="when num" id="last-update"></span>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="controls collapsible">
+      <div class="theme-switch" role="group" aria-label="Theme">
+        <button id="theme-bright" aria-pressed="false">&#9728; Bright</button>
+        <button id="theme-dark" aria-pressed="true">&#9790; Dark</button>
+      </div>
+      <button class="btn" id="settings-btn" title="Settings">&#9881; Settings</button>
+    </div>
+  </header>
+
+  <div class="banners" id="banners" aria-live="polite"></div>
+
+  <main id="view"></main>
+
+  <footer>
+    <div><strong>Information only — not financial advice.</strong> Signals are rule-based technical indicators applied to price history.</div>
+    <div>Market data: Binance public market data. <span id="footer-official"></span></div>
+  </footer>
+</body>
+</html>
