@@ -9,7 +9,7 @@ A live dashboard of crypto prices with rule-based **BUY / HOLD / SELL** signals,
 > Signals are the mechanical output of technical-analysis rules applied to price history.
 > They are information only, **not financial advice**.
 
-> **Status:** under construction (steps 0–3 of 10 done). Sections marked *(coming)* describe later steps.
+> **Status:** under construction (steps 0–5 of 10 done). Sections marked *(coming)* describe later steps.
 
 ---
 
@@ -160,6 +160,23 @@ If the bot token is ever exposed, revoke it in @BotFather (`/revoke`) and update
 9. Run it once normally to create the first `signals.json`, then open the dashboard.
 
 ---
+
+## Workflows (GitHub Actions)
+
+| Workflow | When | What it does |
+|---|---|---|
+| `daily-signal.yml` | Every 15 min (:10, :25, :40, :55) and on manual run | Report on the first run after `telegram.report_time`; alerts in between; commits `data/` when it changes |
+| `tests.yml` | Every push and pull request | Python tests, JavaScript tests, JS/Python match check |
+| `backtest-weekly.yml` | Sundays 09:00 MYT and on manual run | Backtest, saves `data/backtest.json` (step 9) |
+
+**Manual run:** GitHub → Actions → daily-signal → Run workflow, then pick a mode:
+- `test`: sends the report now prefixed `[TEST]` and saves nothing;
+- `force`: sends the report now and saves the data, even if today's was already sent;
+- `auto`: the same as a scheduled run.
+
+Two runs never overlap. Scheduled runs on GitHub can start a few minutes late; a missed run is caught up by the next one.
+
+If no repository activity happens for 60 days, GitHub pauses scheduled workflows. The daily data commits normally prevent this; if it happens, open Actions → daily-signal → Enable workflow.
 
 ## Development
 

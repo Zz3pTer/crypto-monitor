@@ -1,0 +1,77 @@
+# Daily signal job (spec 7.2).
+#
+# Schedules on GitHub Actions can only be written in UTC (FR-TIME-05).
+# "10,25,40,55 * * * *" = minutes :10, :25, :40 and :55 of every hour, UTC.
+# Malaysia time is UTC+8 (whole hours), so these are the same minutes in MYT:
+# e.g. 00:10 UTC = 08:10 MYT, the default report time.
+# The report time itself is NOT set here: python/main.py reads
+# telegram.report_time from config/config.json and sends the report on the
+# first run at or after that time (MYT). The other runs only check alerts.
+name: daily-signal
+
+on:
+  schedule:
+    - cron: "10,25,40,55 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto = normal run; test = send [TEST] report now, save nothing; force = send report now and save"
+        type: choice
+        options: [test, auto, force]
+        default: test
+
+permissions:
+  contents: write          # commit data/ back to the repository
+
+concurrency:
+  group: daily-signal      # two runs never overlap
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+
+      - name: Install packages
+        run: pip install -q -r python/requirements.txt
+
+      - name: Recreate config/keys.json from the KEYS_JSON secret
+        env:
+          KEYS_JSON: ${{ secrets.KEYS_JSON }}
+        run: |
+          if [ -z "$KEYS_JSON" ]; then echo "::error::Secret KEYS_JSON is not set"; exit 1; fi
+          umask 077
+          printf '%s' "$KEYS_JSON" > config/keys.json
+
+      - name: Run the job
+        env:
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'auto' }}
+        run: |
+          case "$MODE" in
+            test)  python python/main.py --test ;;
+            force) python python/main.py --force ;;
+            *)     python python/main.py ;;
+          esac
+
+      - name: Commit data/ if it changed
+        if: always() && (github.event_name != 'workflow_dispatch' || inputs.mode != 'test')
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then echo "no data changes"; exit 0; fi
+          git commit -q -m "Data update $(TZ=Asia/Kuala_Lumpur date '+%Y-%m-%d %H:%M') MYT"
+          for i in 1 2 3; do git pull -q --rebase && git push -q && exit 0; sleep 5; done
+          exit 1
+
+      - name: Remove keys file
+        if: always()
+        run: rm -f config/keys.json
