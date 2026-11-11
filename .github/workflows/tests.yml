@@ -1,4 +1,5 @@
-# Runs on every push and pull request (spec 7.2). JS tests and the JS/Python match check are added in step 3.
+# Runs on every push and pull request (spec 7.2): Python tests, JavaScript tests,
+# and the JS/Python match check on the shared test file (FR-SIG-05).
 name: tests
 on:
   push:
@@ -17,3 +18,11 @@ jobs:
           cache-dependency-path: python/requirements.txt
       - run: pip install -r python/requirements.txt
       - run: python -m pytest -q
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm test

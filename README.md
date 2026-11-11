@@ -9,7 +9,7 @@ A live dashboard of crypto prices with rule-based **BUY / HOLD / SELL** signals,
 > Signals are the mechanical output of technical-analysis rules applied to price history.
 > They are information only, **not financial advice**.
 
-> **Status:** under construction (step 1 of 10 done). Sections marked *(coming)* describe later steps.
+> **Status:** under construction (steps 0–3 of 10 done). Sections marked *(coming)* describe later steps.
 
 ---
 

@@ -1,0 +1,25 @@
+{
+  "about": "Changes applied to config/config.json; each must produce a problem containing 'expect'. Checked by both tests/test_config.py and tests/config.test.js.",
+  "cases": [
+    {"op": "set",    "path": ["signal", "weights", "trend"], "value": 30, "expect": "add up to 110"},
+    {"op": "set",    "path": ["signal", "weights", "rsi"], "value": "15", "expect": "signal.weights.rsi must be a number"},
+    {"op": "set",    "path": ["signal", "periods", "rsi"], "value": 0, "expect": "signal.periods.rsi must be a positive number"},
+    {"op": "set",    "path": ["telegram", "report_time"], "value": "8:10", "expect": "report_time"},
+    {"op": "set",    "path": ["telegram", "report_time"], "value": "24:00", "expect": "report_time"},
+    {"op": "set",    "path": ["refresh", "default_sec"], "value": 7, "expect": "default_sec"},
+    {"op": "set",    "path": ["refresh", "options_sec"], "value": [5, -1], "expect": "options_sec"},
+    {"op": "set",    "path": ["theme", "default"], "value": "blue", "expect": "theme.default"},
+    {"op": "set",    "path": ["data", "lookback_days"], "value": 100, "expect": "lookback_days"},
+    {"op": "set",    "path": ["signal", "thresholds", "buy"], "value": -1, "expect": "thresholds must satisfy"},
+    {"op": "delete", "path": ["signal", "thresholds", "sell"], "expect": "thresholds needs"},
+    {"op": "set",    "path": ["alerts", "check"], "value": "hourly", "expect": "alerts.check"},
+    {"op": "append", "path": ["alerts", "targets"], "value": {"symbol": "DOGE", "above": 1}, "expect": "must match a coin"},
+    {"op": "append", "path": ["alerts", "targets"], "value": {"symbol": "BTC", "above": 1, "below": 2}, "expect": "exactly one"},
+    {"op": "append", "path": ["alerts", "targets"], "value": {"symbol": "BTC", "below": -5}, "expect": "positive price"},
+    {"op": "append", "path": ["symbols"], "value": {"symbol": "BTC", "name": "Bitcoin", "pair": "BTCUSDT", "enabled": true}, "expect": "listed twice"},
+    {"op": "append", "path": ["symbols"], "value": {"symbol": "DOGE", "name": "Dogecoin", "enabled": true}, "expect": "needs a text \"pair\""},
+    {"op": "set",    "path": ["symbols", 0, "enabled"], "value": "yes", "expect": "\"enabled\" must be true or false"},
+    {"op": "set",    "path": ["symbols"], "value": [], "expect": "must be a non-empty list"},
+    {"op": "delete", "path": ["telegram"], "expect": "\"telegram\" section is missing"}
+  ]
+}

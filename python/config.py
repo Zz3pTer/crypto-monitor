@@ -21,6 +21,10 @@ KEY_FIELDS = ("telegram_bot_token", "telegram_chat_id")
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
+def _is_num(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
 class ConfigError(Exception):
     """config.json or keys.json is missing or invalid."""
 
@@ -65,7 +69,7 @@ def validate(cfg: dict) -> list[str]:
         seen.add(sym)
         if "enabled" in s and not isinstance(s["enabled"], bool):
             problems.append(f'{label}: "enabled" must be true or false')
-    enabled = [s for s in symbols if isinstance(s, dict) and s.get("enabled", True)]
+    enabled = [s for s in symbols if isinstance(s, dict) and s.get("enabled", True) is not False]
     if symbols and not enabled:
         problems.append("no coin is enabled")
     if len(enabled) > MAX_COINS:
@@ -73,7 +77,7 @@ def validate(cfg: dict) -> list[str]:
 
     refresh = need("refresh")
     opts = refresh.get("options_sec")
-    if not isinstance(opts, list) or not opts or not all(isinstance(o, int) and o > 0 for o in opts):
+    if not isinstance(opts, list) or not opts or not all(isinstance(o, int) and not isinstance(o, bool) and o > 0 for o in opts):
         problems.append('refresh.options_sec must be a list of positive whole seconds')
     elif refresh.get("default_sec") not in opts:
         problems.append("refresh.default_sec must be one of refresh.options_sec")
@@ -81,28 +85,28 @@ def validate(cfg: dict) -> list[str]:
     if need("theme").get("default") not in ("dark", "bright"):
         problems.append('theme.default must be "dark" or "bright"')
 
-    if need("data").get("lookback_days", 0) < 220:
+    lookback = need("data").get("lookback_days")
+    if not (_is_num(lookback) and lookback >= 220):
         problems.append("data.lookback_days must be at least 220 (FR-SIG-02)")
 
     sig = need("signal")
     periods = sig.get("periods", {})
     weights = sig.get("weights", {})
     for k in PERIOD_KEYS:
-        if not isinstance(periods.get(k), (int, float)) or periods.get(k) <= 0:
+        if not _is_num(periods.get(k)) or periods.get(k) <= 0:
             problems.append(f"signal.periods.{k} must be a positive number")
     for k in WEIGHT_KEYS:
-        if not isinstance(weights.get(k), (int, float)) or weights.get(k) < 0:
+        if not _is_num(weights.get(k)) or weights.get(k) < 0:
             problems.append(f"signal.weights.{k} must be a number of 0 or more")
-    if all(isinstance(weights.get(k), (int, float)) for k in WEIGHT_KEYS):
+    if all(_is_num(weights.get(k)) for k in WEIGHT_KEYS):
         total = sum(weights[k] for k in WEIGHT_KEYS)
         if total != 100:
             problems.append(f"signal.weights add up to {total}; they must add up to 100 so the score runs from -100 to +100")
-    th = sig.get("thresholds", {})
-    try:
-        if not (th["strong_sell"] < th["sell"] < 0 < th["buy"] < th["strong_buy"]):
-            problems.append("signal.thresholds must satisfy strong_sell < sell < 0 < buy < strong_buy")
-    except (KeyError, TypeError):
+    th = sig.get("thresholds")
+    if not isinstance(th, dict) or not all(_is_num(th.get(k)) for k in ("strong_buy", "buy", "sell", "strong_sell")):
         problems.append("signal.thresholds needs strong_buy, buy, sell and strong_sell")
+    elif not (th["strong_sell"] < th["sell"] < 0 < th["buy"] < th["strong_buy"]):
+        problems.append("signal.thresholds must satisfy strong_sell < sell < 0 < buy < strong_buy")
 
     tg = need("telegram")
     if not _TIME_RE.match(str(tg.get("report_time", ""))):
@@ -117,7 +121,7 @@ def validate(cfg: dict) -> list[str]:
             problems.append(f"{label}: symbol must match a coin in \"symbols\"")
             continue
         levels = [k for k in ("above", "below") if k in t]
-        if len(levels) != 1 or not isinstance(t[levels[0]], (int, float)) or t[levels[0]] <= 0:
+        if len(levels) != 1 or not _is_num(t[levels[0]]) or t[levels[0]] <= 0:
             problems.append(f'{label}: needs exactly one of "above" or "below" with a positive price')
 
     return problems
@@ -132,7 +136,7 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
 
 
 def enabled_symbols(cfg: dict) -> list[dict]:
-    return [s for s in cfg["symbols"] if s.get("enabled", True)]
+    return [s for s in cfg["symbols"] if s.get("enabled", True) is not False]
 
 
 def load_keys(path: Path = KEYS_PATH) -> dict:

@@ -27,19 +27,28 @@ def test_disabled_coin_is_skipped(cfg):
     assert "BTC" not in [s["symbol"] for s in C.enabled_symbols(cfg)]
 
 
-@pytest.mark.parametrize("mutate, expected", [
-    (lambda c: c["signal"]["weights"].update(trend=30), "add up to 110"),
-    (lambda c: c["telegram"].update(report_time="8:10"), "report_time"),
-    (lambda c: c["refresh"].update(default_sec=7), "default_sec"),
-    (lambda c: c["alerts"]["targets"].append({"symbol": "DOGE", "above": 1}), "must match a coin"),
-    (lambda c: c["alerts"]["targets"].append({"symbol": "BTC", "above": 1, "below": 2}), "exactly one"),
-    (lambda c: c["symbols"].append(dict(c["symbols"][0])), "listed twice"),
-    (lambda c: c["signal"]["thresholds"].update(buy=-1), "thresholds"),
-])
-def test_bad_config_is_reported(cfg, mutate, expected):
+CASES = json.loads((C.ROOT / "tests" / "fixtures" / "config_cases.json").read_text(encoding="utf-8"))["cases"]
+
+
+def apply_case(cfg, case):
+    *parents, last = case["path"]
+    node = cfg
+    for key in parents:
+        node = node[key]
+    if case["op"] == "set":
+        node[last] = copy.deepcopy(case["value"])
+    elif case["op"] == "append":
+        node[last].append(copy.deepcopy(case["value"]))
+    elif case["op"] == "delete":
+        del node[last]
+
+
+@pytest.mark.parametrize("case", CASES, ids=[c["expect"] for c in CASES])
+def test_bad_config_is_reported(cfg, case):
     cfg = copy.deepcopy(cfg)
-    mutate(cfg)
-    assert any(expected in p for p in C.validate(cfg))
+    apply_case(cfg, case)
+    problems = C.validate(cfg)
+    assert any(case["expect"] in p for p in problems), problems
 
 
 def test_unreadable_config_raises_clear_error(tmp_path):
