@@ -1,0 +1,9 @@
+{
+  "name": "crypto-monitor",
+  "private": true,
+  "type": "module",
+  "description": "Crypto Signal Monitor dashboard. No dependencies; package.json only lets Node run the JS tests.",
+  "scripts": {
+    "test": "node --test tests/"
+  }
+}
