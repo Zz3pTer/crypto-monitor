@@ -169,7 +169,8 @@ Requires Python 3.12 and Node.js 20+. No npm packages are used.
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -r python\requirements.txt
 .venv\Scripts\python -m pytest          # Python tests
-npm test                                # JavaScript tests (coming)
+npm test                                # JavaScript tests + JS/Python match check
+.venv\Scripts\python tests\make_fixtures.py --offline   # after changing the signal engine: refresh expected results
 py -3.12 -m http.server 8000            # preview the dashboard at http://localhost:8000 (coming)
 ```
 
