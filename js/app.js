@@ -7,6 +7,7 @@ import * as store from "./store.js";
 import * as theme from "./theme.js";
 import * as fmt from "./format.js";
 import * as ov from "./ui-overview.js";
+import { DetailView } from "./ui-detail.js";
 
 const $ = (id) => document.getElementById(id);
 const SIGNALS_URL = "data/signals.json";
@@ -32,6 +33,7 @@ const S = {
   search: "",
   prevPrices: new Map(),
   pollAdjusted: null,
+  detail: null,            // DetailView while #/asset/<SYM> is open
 };
 
 // ---------- banners ----------
@@ -126,7 +128,8 @@ function feedStatus() {
 
 function paint() {
   S.lastPaint = new Date();
-  if (location.hash.startsWith("#/asset/")) { paintDetail(); updateStatus(); return; }
+  if (detailSymbol()) { paintDetail(); updateStatus(); return; }
+  if (S.detail) { S.detail.destroy(); S.detail = null; $("view").innerHTML = ""; }
   const all = models();
   const counts = { BUY: 0, HOLD: 0, SELL: 0 };
   for (const m of all) if (m.signal) counts[m.signal]++;
@@ -162,14 +165,30 @@ function paint() {
   updateStatus();
 }
 
+function detailSymbol() {
+  return location.hash.startsWith("#/asset/") ? decodeURIComponent(location.hash.slice("#/asset/".length)).toUpperCase() : null;
+}
+
 function paintDetail() {
-  // The full detail screen arrives in step 7.
-  const sym = decodeURIComponent(location.hash.slice("#/asset/".length)).toUpperCase();
-  const m = models().find((x) => x.symbol === sym);
-  $("view").innerHTML = `<div class="placeholder">
-      <p><a href="#/">‹ Back</a></p>
-      <h2>${fmt.escape(sym)} ${m ? `— ${fmt.escape(m.name)} · ${fmt.price(m.livePrice)}` : "(not in the coin list)"}</h2>
-      <p>The detail screen (charts, score gauge, indicator breakdown, signal history) is being built.</p></div>`;
+  const sym = detailSymbol();
+  const coin = S.coins.find((c) => c.symbol === sym);
+  if (!coin) {
+    S.detail?.destroy();
+    S.detail = null;
+    $("view").innerHTML = `<div class="placeholder"><p><a href="#/">‹ Back</a></p>
+      <h2>${fmt.escape(sym)} is not in the coin list</h2><p>Add it in the settings, or check the address.</p></div>`;
+    return;
+  }
+  if (!S.loaded) return;
+  if (!S.detail || S.detail.ctx.coin.symbol !== sym) {
+    S.detail?.destroy();
+    S.detail = new DetailView($("view"), {
+      cfg: S.cfg, feed: S.feed, coin,
+      getModel: () => models().find((x) => x.symbol === coin.symbol),
+      getOfficial: () => S.official,
+    });
+  }
+  S.detail.update();
 }
 
 function mountOverview() {
@@ -268,6 +287,7 @@ async function main() {
     return;
   }
   theme.init(S.cfg);
+  theme.onChange(() => S.detail?.applyTheme());
   S.coins = enabledSymbols(S.cfg);
   const opts = S.cfg.refresh.options_sec;
   const savedSec = store.get("refreshSec");

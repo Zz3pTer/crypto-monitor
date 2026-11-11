@@ -43,6 +43,11 @@ export class Feed {
     return res.json();
   }
 
+  // Candles for the detail chart: interval is "1h", "4h", "1d" or "1w".
+  async klines(pair, interval, limit = 500) {
+    return (await this._get("/api/v3/klines", { symbol: pair, interval, limit })).map(kline);
+  }
+
   // ---------- history (charts, sparklines, provisional signal) ----------
 
   async loadHistory(dailyLimit = 260) {
