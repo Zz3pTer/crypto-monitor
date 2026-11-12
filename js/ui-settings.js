@@ -13,7 +13,7 @@ import * as gh from "./github.js";
 import { viewCoins, removeLocal } from "./coins.js";
 
 const esc = fmt.escape;
-const LOCAL_KEYS = ["refreshSec", "slowHidden", "coinOrder", "hiddenCoins", "overlays", "filter", "sort", "detailTf", "paused"];
+const LOCAL_KEYS = ["refreshSec", "slowHidden", "coinOrder", "hiddenCoins", "overlays", "filter", "sort", "detailTf", "detailRange", "paused"];
 const WEIGHT_LABELS = { trend: "Trend (price vs SMA 200)", cross: "SMA 50 vs SMA 200", macd: "MACD", rsi: "RSI", bollinger: "Bollinger", momentum: "Momentum ROC", volume: "Volume" };
 const PERIOD_LABELS = { sma_fast: "SMA fast", sma_slow: "SMA slow", ema: "EMA", rsi: "RSI", bb: "Bollinger length", bb_std: "Bollinger width (std)",
   macd_fast: "MACD fast", macd_slow: "MACD slow", macd_signal: "MACD signal", roc: "Momentum ROC", vol_avg: "Volume average" };

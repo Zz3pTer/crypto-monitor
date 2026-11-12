@@ -6,9 +6,9 @@ import * as store from "./store.js";
 import { RULES } from "./signals.js";
 import { help } from "./ui-overview.js";
 import { loadLibrary, OVERLAYS, PriceChart } from "./charts.js";
+import * as R from "./chart-range.js";
 
 const esc = fmt.escape;
-const TIMEFRAMES = [["1H", "1h", 500], ["4H", "4h", 500], ["1D", "1d", 500], ["1W", "1w", 300]];
 const DAY_MS = 86_400_000;
 const TF_RELOAD_MS = 5 * 60_000;
 const PHONE = "(max-width: 767px)";
@@ -100,7 +100,9 @@ export class DetailView {
   constructor(view, ctx) {
     this.view = view;
     this.ctx = ctx;                               // { cfg, feed, coin, getModel, getOfficial }
-    this.tf = store.get("detailTf", "1D");
+    this.range = R.rangeOf(store.get("detailRange", R.DEFAULT_RANGE)).key;    // which dates are shown
+    this.tf = R.intervalOf(store.get("detailTf", "1D")).key;                    // candle size
+    if (!R.allowed(this.range, this.tf)) this.tf = R.defaultInterval(this.range);
     this.overlays = store.get("overlays", { sma50: true, sma200: true, bb: true, ema20: true });
     this.paneTab = "rsi";
     this.mode = null;                            // "official" | "live" (breakdown shown)
@@ -127,11 +129,15 @@ export class DetailView {
         <button class="btn mini d-manage" id="d-manage" title="Add for everyone, or remove">${c.local ? "My view only · Manage" : "Manage coin"}</button>
       </section>
       <section class="d-toolbar">
-        <div class="tabs" role="tablist" aria-label="Timeframe">${TIMEFRAMES.map(([k]) =>
-          `<button class="tab" role="tab" data-tf="${k}" aria-selected="${k === this.tf}">${k}</button>`).join("")}</div>
+        <div class="tf-group"><span class="tf-label">Period</span>
+          <div class="tabs" role="group" aria-label="Period shown">${R.RANGES.map((r) =>
+            `<button class="tab" data-range="${r.key}" title="Show ${r.name}">${r.label}</button>`).join("")}</div></div>
+        <div class="tf-group"><span class="tf-label">Candles</span>
+          <div class="tabs" role="group" aria-label="Candle size">${R.INTERVALS.map((i) =>
+            `<button class="tab" data-tf="${i.key}">${i.label}</button>`).join("")}</div></div>
         <div class="overlays" role="group" aria-label="Overlays">${Object.entries(OVERLAYS).map(([k, o]) =>
           `<span class="ov-wrap"><button class="ov" data-ov="${k}" aria-pressed="${Boolean(this.overlays[k])}"><span class="key" style="background:${o.color}"></span>${esc(o.label)}</button>${help(o.help)}</span>`).join("")}</div>
-        <span class="muted tf-note">The signal always uses daily (1D) candles.</span>
+        <span class="muted tf-note">The signal always uses daily (1d) candles, whatever the chart shows.</span>
       </section>
       <section class="d-body">
         <div class="d-chart card-like">
@@ -169,6 +175,8 @@ export class DetailView {
       </section>`;
 
     this.view.querySelectorAll("[data-tf]").forEach((b) => b.addEventListener("click", () => this.setTf(b.dataset.tf)));
+    this.view.querySelectorAll("[data-range]").forEach((b) => b.addEventListener("click", () => this.setRange(b.dataset.range)));
+    this.tfButtons();
     this.view.querySelectorAll("[data-ov]").forEach((b) => b.addEventListener("click", () => {
       this.overlays[b.dataset.ov] = !this.overlays[b.dataset.ov];
       store.set("overlays", this.overlays);
@@ -242,30 +250,66 @@ export class DetailView {
     this.chart?.setPaneLabels(phone ? [] : [rsiLabel, macdLabel]);
   }
 
+  // Highlights the chosen period and candle size; greys out candle sizes
+  // that give too few or too many candles for the period.
+  tfButtons() {
+    this.view.querySelectorAll("[data-range]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === this.range)));
+    this.view.querySelectorAll("[data-tf]").forEach((b) => {
+      const why = R.whyNot(this.range, b.dataset.tf);
+      b.setAttribute("aria-pressed", String(b.dataset.tf === this.tf));
+      b.disabled = Boolean(why);
+      b.title = why || `${R.intervalOf(b.dataset.tf).name} candles`;
+    });
+  }
+
+  async setRange(range) {
+    this.range = range;
+    this.tf = R.defaultInterval(range);
+    store.set("detailRange", range);
+    store.set("detailTf", this.tf);
+    this.tfButtons();
+    await this.loadTf(true);
+  }
+
   async setTf(tf) {
+    if (!R.allowed(this.range, tf)) return;
     this.tf = tf;
     store.set("detailTf", tf);
-    this.view.querySelectorAll("[data-tf]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tf === tf)));
+    this.tfButtons();
     await this.loadTf(true);
   }
 
   async loadTf(fit = false) {
     if (!this.chart) return;
-    const [, interval, limit] = TIMEFRAMES.find(([k]) => k === this.tf);
-    const tf = this.tf;
+    const tf = this.tf, range = this.range;
+    const iv = R.intervalOf(tf);
+    const title = this.view.querySelector("#chart-title");
+    if (fit) title.textContent = "Loading…";
     try {
-      const bars = await this.ctx.feed.klines(this.ctx.coin.pair, interval, limit);
-      if (tf !== this.tf || !this.chart) return;            // the user switched while loading
+      const bars = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, R.barsToLoad(range, tf));
+      if (tf !== this.tf || range !== this.range || !this.chart) return;   // the user switched while loading
       this.tfBars = bars;
       this.tfLoadedAt = Date.now();
       this.chart.setData(bars, this.ctx.cfg.signal);
-      if (fit) this.chart.fit(this.tf === "1W" ? 104 : 120);
+      const start = R.rangeStart(range);
+      const p = R.periodChange(bars, start);
+      if (fit) this.chart.fit(p ? p.bars : bars.length);
       this.applyMarkers();
-      const n = { "1H": "hourly", "4H": "4-hour", "1D": "daily", "1W": "weekly" }[tf];
-      this.view.querySelector("#chart-title").textContent = `Price (${n} candles, MYT)`;
+      title.innerHTML = p ? this.periodTitle(p, start, iv) : `Price (${iv.name} candles, MYT)`;
     } catch (e) {
-      this.view.querySelector("#chart-title").textContent = `Price — could not load ${tf} candles (${e.message})`;
+      title.textContent = `Price — could not load ${iv.name} candles (${e.message})`;
     }
+  }
+
+  // "1 year · 12 Nov 2025 – 12 Nov 2026 · ▲ +40.2% · daily candles, MYT"
+  periodTitle(p, start, iv) {
+    const r = R.rangeOf(this.range);
+    const short = start !== null && p.from > start + iv.ms;          // the coin is younger than the period
+    const ch = p.changePct === null ? "" : ` · <span class="num ${p.changePct >= 0 ? "up" : "down"}">${p.changePct >= 0 ? "▲" : "▼"} ${fmt.pct(p.changePct)}</span>`;
+    const dates = this.range === "1D" || this.range === "1W"
+      ? `${fmt.dateTime(Math.max(p.from, start ?? p.from))} – now`
+      : `${fmt.date(Math.max(p.from, start ?? p.from))} – ${fmt.date(Math.min(p.to, Date.now()))}`;
+    return `Price · ${esc(r.name)} · ${esc(dates)}${ch} · ${iv.name} candles, MYT${short ? ` <span class="tag">only since ${esc(fmt.date(p.from))}</span>` : ""}`;
   }
 
   applyMarkers() {

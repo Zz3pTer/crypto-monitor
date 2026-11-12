@@ -346,6 +346,13 @@ main { padding: 16px 24px 24px; flex: 1; width: 100%; max-width: 1600px; margin:
 .ov[aria-pressed="false"] { color: var(--label); text-decoration: line-through; }
 .ov[aria-pressed="false"] .key { opacity: .35; }
 .tf-note { font-size: 12px; }
+.tf-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tf-label { font-size: 12px; color: var(--label); text-transform: uppercase; letter-spacing: .04em; min-width: 54px; }
+.tf-group .tab { padding: 5px 11px; }
+.tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.tab:disabled { opacity: .35; cursor: not-allowed; }
+.chart-title .up { color: var(--buy); } .chart-title .down { color: var(--sell); }
+.chart-title .tag { margin-left: 6px; }
 
 .d-body { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; }
 .card-like { background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
@@ -410,6 +417,10 @@ main { padding: 16px 24px 24px; flex: 1; width: 100%; max-width: 1600px; margin:
   .d-pair { font-size: 20px; }
   .d-head .price { font-size: 22px; }
   .tf-note { width: 100%; }
+  .tf-group { width: 100%; gap: 4px; }
+  .tf-label { width: 100%; }
+  .tf-group .tabs { flex-wrap: nowrap; width: 100%; gap: 4px; }
+  .tf-group .tab { flex: 1 1 0; min-width: 0; padding: 6px 0; font-size: 13px; text-align: center; }
   .chart-box { height: 460px; }
   .d-chart.phone .pane-tabs { display: flex; }
   .d-side { display: flex; }

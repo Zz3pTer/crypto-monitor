@@ -44,8 +44,18 @@ export class Feed {
   }
 
   // Candles for the detail chart: interval is "1h", "4h", "1d" or "1w".
+  // Binance gives at most 1000 per request, so longer periods are fetched in
+  // parts, going back in time, until `limit` or the coin's first candle.
   async klines(pair, interval, limit = 500) {
-    return (await this._get("/api/v3/klines", { symbol: pair, interval, limit })).map(kline);
+    let rows = [], end = null;
+    while (rows.length < limit) {
+      const want = Math.min(limit - rows.length, 1000);
+      const part = await this._get("/api/v3/klines", { symbol: pair, interval, limit: want, ...(end ? { endTime: end } : {}) });
+      rows = part.concat(rows);
+      if (part.length < want) break;
+      end = part[0][0] - 1;
+    }
+    return rows.map(kline);
   }
 
   // ---------- history (charts, sparklines, provisional signal) ----------
