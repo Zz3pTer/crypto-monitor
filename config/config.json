@@ -8,8 +8,7 @@
     {"symbol": "XRP", "name": "XRP", "pair": "XRPUSDT", "coingecko_id": "ripple", "enabled": true},
     {"symbol": "ALGO", "name": "Algorand", "pair": "ALGOUSDT", "coingecko_id": "algorand", "enabled": true},
     {"symbol": "HBAR", "name": "Hedera", "pair": "HBARUSDT", "coingecko_id": "hedera-hashgraph", "enabled": true},
-    {"symbol": "LINK", "name": "Chainlink", "pair": "LINKUSDT", "coingecko_id": "chainlink", "enabled": true},
-    {"symbol": "DOGE", "name": "Dogecoin", "pair": "DOGEUSDT", "coingecko_id": "", "enabled": true}
+    {"symbol": "LINK", "name": "Chainlink", "pair": "LINKUSDT", "coingecko_id": "chainlink", "enabled": true}
   ],
   "refresh": {"options_sec": [5, 10, 15, 30, 60, 300, 900], "default_sec": 30, "hidden_tab_sec": 300, "polling_min_sec": 5},
   "theme": {"default": "dark"},
