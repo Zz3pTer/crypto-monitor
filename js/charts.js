@@ -76,7 +76,10 @@ export class PriceChart {
       ...themeOptions(),
       crosshair: { mode: 0 },
       localization: { timeFormatter: (t) => fmt.dateTime(t * 1000) },
-      timeScale: { ...themeOptions().timeScale, timeVisible: true, secondsVisible: false, tickMarkFormatter: tickLabel, rightOffset: 4 },
+      // fixLeftEdge / fixRightEdge: the chart cannot be scrolled or pinched out
+      // past the first or the latest candle, so no empty space is shown.
+      timeScale: { ...themeOptions().timeScale, timeVisible: true, secondsVisible: false, tickMarkFormatter: tickLabel,
+        rightOffset: 0, fixLeftEdge: true, fixRightEdge: true },
     });
     const up = css("--buy"), down = css("--sell");
     this.candles = this.chart.addSeries(LWC.CandlestickSeries, {
@@ -200,7 +203,7 @@ export class PriceChart {
 
   fit(barsVisible = 120) {
     const n = this.bars.length;
-    if (n) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - barsVisible), to: n + 3 });
+    if (n) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - barsVisible) - 0.5, to: n - 0.5 });
   }
 
   destroy() {
