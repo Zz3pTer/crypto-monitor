@@ -230,13 +230,15 @@ export class PriceChart {
     this.glow = { left: mk("edge-glow left"), right: mk("edge-glow right") };
     this.pill = mk("scroll-pill");
     this.pillThumb = mk("thumb", this.pill);
-    this.loadingChip = mk("chart-chip");
-    this.loadingChip.textContent = "Loading older prices…";
+    // Grey cover with a spinner while the user waits for candles.
+    this.loadingEl = mk("chart-loading");
+    this.loadingEl.setAttribute("role", "status");
+    this.loadingEl.innerHTML = `<div class="box"><span class="spin" aria-hidden="true"></span><span class="txt"></span></div>`;
     this.pull = { left: 0, right: 0 };
     let lastX = null, lastDist = null, mouseDown = false, wheelTimer = null;
 
     const push = (side, amount) => {
-      if (side === "left" && this.moreOlder) { this.setLoading(true); this.onNeedOlder?.(); return; }
+      if (side === "left" && this.moreOlder) { this.setLoading("Loading older prices…"); this.onNeedOlder?.(); return; }
       this.pull[side] = Math.min(160, this.pull[side] + amount);
       const k = this.pull[side] / 160;
       const g = this.glow[side];
@@ -309,8 +311,10 @@ export class PriceChart {
     });
   }
 
-  setLoading(on) {
-    this.loadingChip.classList.toggle("on", Boolean(on));
+  // setLoading("Loading weekly candles…") shows the cover; setLoading(null) hides it.
+  setLoading(text) {
+    if (text) this.loadingEl.querySelector(".txt").textContent = text;
+    this.loadingEl.classList.toggle("on", Boolean(text));
   }
 
   // Thin bar under the dates: where the view is within the loaded history.

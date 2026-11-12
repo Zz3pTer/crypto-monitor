@@ -311,11 +311,15 @@ export class DetailView {
     const tf = this.tf, range = this.range;
     const iv = R.intervalOf(tf);
     const title = this.view.querySelector("#chart-title");
-    if (user) title.textContent = "Loading…";
+    if (user) {
+      title.textContent = "Loading…";
+      this.chart.setLoading(`Loading ${R.rangeOf(range).name}…`);
+    }
     try {
       const want = R.barsToLoad(range, tf);
       const bars = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, want);
       if (gen !== this.gen || !this.chart) return;          // something newer was asked for meanwhile
+      this.chart.setLoading(null);
       this.setBars(bars, want);
       this.chart.setData(bars, this.ctx.cfg.signal);
       const p = R.periodChange(bars, R.rangeStart(range));
@@ -326,7 +330,25 @@ export class DetailView {
       if (this.moreOlder) this.loadOlder();                  // ready before anyone zooms out
     } catch (e) {
       if (gen === this.gen) title.textContent = `Price — could not load ${iv.name} candles (${e.message})`;
+      this.doneLoading(gen);
     }
+  }
+
+  // Waits for `promise`. If it is still loading once the gesture is over
+  // (and `when()` holds), the chart is covered with a loading message.
+  async waitFor(promise, text, when = () => true) {
+    let done = false;
+    promise.then(() => { done = true; }, () => { done = true; });
+    await this.chart?.idle();
+    if (!done && when()) this.chart?.setLoading(text);
+    const out = await promise;
+    await this.chart?.idle();
+    return out;
+  }
+
+  // Hides the loading cover, unless something newer is loading.
+  doneLoading(gen) {
+    if (gen === this.gen) this.chart?.setLoading(null);
   }
 
   setBars(bars, asked) {
@@ -370,8 +392,8 @@ export class DetailView {
     this.busy = true;
     const gen = ++this.gen;
     try {
-      const bars = await this.ctx.feed.klines(this.ctx.coin.pair, R.intervalOf(key).api, want);
-      await this.chart?.idle();
+      const bars = await this.waitFor(this.ctx.feed.klines(this.ctx.coin.pair, R.intervalOf(key).api, want),
+        `Loading ${R.intervalOf(key).name} candles…`);
       if (gen !== this.gen || !this.chart) return;
       const now = this.visibleTimes() ?? vt;                  // the dates on screen once the gesture ended
       const end = this.chart.atRight() ? Infinity : (now.b.closeTime ?? now.t1);
@@ -386,6 +408,7 @@ export class DetailView {
       this.updateTitle();
     } catch { /* keep the current candles */ } finally {
       this.busy = false;
+      this.doneLoading(gen);
     }
   }
 
@@ -396,8 +419,8 @@ export class DetailView {
     const gen = ++this.gen;
     try {
       const iv = R.intervalOf(this.tf);
-      const older = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, 1000, this.tfBars[0].time - 1);
-      await this.chart?.idle();
+      const older = await this.waitFor(this.ctx.feed.klines(this.ctx.coin.pair, iv.api, 1000, this.tfBars[0].time - 1),
+        "Loading older prices…", () => this.chart?.atLeft());
       if (gen !== this.gen || !this.chart) return;
       const merged = R.mergeBars(older, this.tfBars);
       this.tfBars = merged;
@@ -408,7 +431,7 @@ export class DetailView {
       this.updateTitle();
     } catch { /* try again on the next push */ } finally {
       this.busy = false;
-      this.chart?.setLoading(false);
+      this.doneLoading(gen);
     }
     this.maybeSwitch();                                    // a zoom that happened while loading
   }
