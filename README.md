@@ -169,7 +169,7 @@ If the bot token is ever exposed, revoke it in @BotFather (`/revoke`) and update
 
 ---
 
-## Setup *(full steps completed in step 10)*
+## Setup
 
 1. Create the GitHub repository and push the code. *(done)*
 2. Edit `config/config.json`: check the coin list, refresh frequency, report time and alert targets.
@@ -180,6 +180,12 @@ If the bot token is ever exposed, revoke it in @BotFather (`/revoke`) and update
 7. GitHub → Settings → Pages: publish from the `main` branch. Settings → Actions → General: allow workflows read and write permission.
 8. Actions → daily-signal → Run workflow with **test** ticked; check the `[TEST]` message arrives.
 9. Run it once normally to create the first `signals.json`, then open the dashboard.
+10. **On-time timer** (GitHub's own schedule often runs late or skips runs):
+    - Create a fine-grained token at <https://github.com/settings/personal-access-tokens/new>, named `crypto-monitor scheduler`, for the `crypto-monitor` repository only, with **Actions: Read and write** and nothing else.
+    - At [cron-job.org](https://cron-job.org) create a job: URL `https://api.github.com/repos/Zz3pTer/crypto-monitor/actions/workflows/daily-signal.yml/dispatches`, method **POST**, schedule crontab `10,25,40,55 * * * *`, time zone Asia/Kuala_Lumpur.
+    - Headers: `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, `Content-Type: application/json`. Body: `{"ref":"main","inputs":{"mode":"auto"}}`.
+    - Notifications: on for failures. **Test run** must answer `204 No Content`.
+11. **Settings token** for each person who may change shared settings or the shared coin list: a fine-grained token for `crypto-monitor` only, with **Contents: Read and write**. Paste it into the dashboard's Settings → Shared settings; it stays in that browser.
 
 ---
 
@@ -196,7 +202,16 @@ If the bot token is ever exposed, revoke it in @BotFather (`/revoke`) and update
 - `force`: sends the report now and saves the data, even if today's was already sent;
 - `auto`: the same as a scheduled run.
 
-Two runs never overlap. Scheduled runs on GitHub can start a few minutes late; a missed run is caught up by the next one.
+Two runs never overlap. The runs are started on time by the cron-job.org timer (setup step 10); GitHub's own schedule stays on as a backup. A run that finds today's report already sent only updates the data, so a report is never sent twice.
+
+### Tokens to renew
+
+| Token | Where it is kept | Expires | When it expires |
+|---|---|---|---|
+| `crypto-monitor scheduler` | cron-job.org job headers | 11 Nov 2027 | cron-job.org emails about failed runs (401). Make a new token and paste it into the `Authorization` header. |
+| Settings tokens | Each person's browser | As set when made | Saving on the dashboard says the token is not valid. Make a new one and paste it in Settings. |
+
+When renewing the scheduler token, also change `X-GitHub-Api-Version` to GitHub's newest version: `2022-11-28` stops working on 10 Mar 2028.
 
 If no repository activity happens for 60 days, GitHub pauses scheduled workflows. The daily data commits normally prevent this; if it happens, open Actions → daily-signal → Enable workflow.
 
