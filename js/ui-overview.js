@@ -30,6 +30,7 @@ export function mountOverview(view, handlers) {
         <option value="score">Sort: Score (high→low)</option>
         <option value="change">Sort: 24h change (high→low)</option>
         <option value="name">Sort: Name (A→Z)</option>
+        <option value="custom">Sort: My order (Settings)</option>
       </select>
       <input class="btn search" id="search" type="search" placeholder="Search symbol…" aria-label="Search symbol" autocomplete="off">
     </section>

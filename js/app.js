@@ -1,6 +1,6 @@
 // Dashboard entry point: loads config and official signals, starts the live
 // feed, and repaints at the chosen refresh interval (spec 3, 4.2, 5.2).
-import { loadConfig, enabledSymbols, ConfigError } from "./config.js";
+import { loadConfig, enabledSymbols, validate, ConfigError } from "./config.js";
 import { evaluate } from "./signals.js";
 import { Feed } from "./data-source.js";
 import * as store from "./store.js";
@@ -8,6 +8,8 @@ import * as theme from "./theme.js";
 import * as fmt from "./format.js";
 import * as ov from "./ui-overview.js";
 import { DetailView } from "./ui-detail.js";
+import * as tooltip from "./tooltip.js";
+import * as settings from "./ui-settings.js";
 
 const $ = (id) => document.getElementById(id);
 const SIGNALS_URL = "data/signals.json";
@@ -16,7 +18,10 @@ const HISTORY_RELOAD_MS = 15 * 60_000;
 
 const S = {
   cfg: null,
-  coins: [],
+  baseCfg: null,           // config.json as published (before any change tried in this browser)
+  overrideActive: false,
+  allCoins: [],            // every enabled coin (the live feed follows all of them)
+  coins: [],               // the coins shown, in this browser's order
   feed: null,
   official: null,          // contents of data/signals.json, or null
   officialLoadedAt: 0,
@@ -39,9 +44,9 @@ const S = {
 // ---------- banners ----------
 
 const banners = new Map();
-function setBanner(id, kind, text) {
-  if (text) banners.set(id, { kind, text }); else banners.delete(id);
-  $("banners").innerHTML = [...banners.values()].map((b) => `<div class="banner ${b.kind}">${fmt.escape(b.text)}</div>`).join("");
+function setBanner(id, kind, text, html = null) {
+  if (text || html) banners.set(id, { kind, html: html ?? fmt.escape(text) }); else banners.delete(id);
+  $("banners").innerHTML = [...banners.values()].map((b) => `<div class="banner ${b.kind}">${b.html}</div>`).join("");
 }
 
 // ---------- official signals ----------
@@ -77,12 +82,12 @@ function officialBanner() {
 
 // ---------- model ----------
 
-function models() {
+function models(coins = S.coins) {
   const sig = S.cfg.signal;
   const officialBySym = new Map((S.official?.assets ?? []).map((a) => [a.symbol, a]));
   const staleMs = (S.cfg.data.stale_after_intervals ?? 3) * S.effectiveSec * 1000;
   const now = Date.now();
-  return S.coins.map((c) => {
+  return coins.map((c) => {
     const a = S.feed.assets.get(c.symbol);
     const off = officialBySym.get(c.symbol);
     const okOff = off && off.status === "ok" ? off : null;
@@ -141,7 +146,8 @@ function paint() {
     score: (a, b) => (b.score ?? -999) - (a.score ?? -999),
     change: (a, b) => (b.ticker?.changePct ?? -999) - (a.ticker?.changePct ?? -999),
     name: (a, b) => a.symbol.localeCompare(b.symbol),
-  }[S.sort];
+    custom: () => 0,
+  }[S.sort] ?? (() => 0);
   shown = shown.sort(by);
 
   // Prices flash green or red briefly when they move (FR-UI-10).
@@ -155,7 +161,7 @@ function paint() {
   const view = $("view");
   if (!view.querySelector("#grid")) mountOverview();
   if (!S.loaded) {
-    ov.renderSkeleton(view, S.coins.length);
+    ov.renderSkeleton(view, Math.max(S.coins.length, 1));
   } else {
     ov.renderCards(view, shown, S.cfg.signal.thresholds, flashes);
     if (flashes.size) setTimeout(() => view.querySelectorAll(".price.flash-up, .price.flash-down")
@@ -171,7 +177,7 @@ function detailSymbol() {
 
 function paintDetail() {
   const sym = detailSymbol();
-  const coin = S.coins.find((c) => c.symbol === sym);
+  const coin = S.allCoins.find((c) => c.symbol === sym);
   if (!coin) {
     S.detail?.destroy();
     S.detail = null;
@@ -184,7 +190,7 @@ function paintDetail() {
     S.detail?.destroy();
     S.detail = new DetailView($("view"), {
       cfg: S.cfg, feed: S.feed, coin,
-      getModel: () => models().find((x) => x.symbol === coin.symbol),
+      getModel: () => models(S.allCoins).find((x) => x.symbol === coin.symbol),
       getOfficial: () => S.official,
     });
   }
@@ -263,10 +269,7 @@ function setupHeader() {
 
   $("refresh-btn").addEventListener("click", () => { S.officialLoadedAt = 0; refreshNow(); });
 
-  $("settings-btn").addEventListener("click", () => {
-    setBanner("settings", "info", "The settings panel (all settings, saved to GitHub) is being built.");
-    setTimeout(() => setBanner("settings", null, null), 4000);
-  });
+  $("settings-btn").addEventListener("click", openSettings);
 
   const header = $("header"), toggle = $("menu-toggle");
   toggle.addEventListener("click", () => {
@@ -276,11 +279,73 @@ function setupHeader() {
   });
 }
 
+// ---------- settings, help pop-ups ----------
+
+function applyCoinPrefs() {
+  const hidden = new Set(store.get("hiddenCoins", []));
+  S.coins = settings.orderedCoins(S.cfg).filter((c) => !hidden.has(c.symbol));
+}
+
+function openSettings() {
+  settings.open({
+    cfg: S.cfg,
+    baseCfg: S.baseCfg,
+    overrideActive: S.overrideActive,
+    refreshSec: S.intervalSec,
+    onLocalChange: (resetAll = false) => {
+      const opts = S.cfg.refresh.options_sec;
+      const saved = store.get("refreshSec");
+      S.intervalSec = opts.includes(saved) ? saved : S.cfg.refresh.default_sec;
+      $("refresh-select").value = String(S.intervalSec);
+      if (resetAll) {
+        S.filter = "ALL"; S.sort = "score"; S.paused = false;
+        $("pause-btn").setAttribute("aria-pressed", "false");
+        $("pause-btn").innerHTML = "❚❚ Pause";
+      }
+      computeEffective();
+      S.remaining = Math.min(S.remaining, S.effectiveSec);
+      applyCoinPrefs();
+      paint();
+    },
+    onTryLocally: (cfg) => { store.set("configOverride", cfg); location.reload(); },
+    onDiscardLocal: discardOverride,
+    onSaved: () => { store.set("configOverride", null); },
+  });
+}
+
+function discardOverride() {
+  store.set("configOverride", null);
+  location.reload();
+}
+
+// Values for the "Now: …" line of a help pop-up.
+function resolveHelp(sym) {
+  const s = sym || detailSymbol();
+  if (!s) return null;
+  const m = models(S.allCoins).find((x) => x.symbol === s);
+  if (!m) return null;
+  const res = S.detail && S.detail.ctx.coin.symbol === s
+    ? (S.detail.mode === "official" ? m.official : m.live) ?? m.live
+    : m.official ?? m.live;
+  return res ? { sym: s, res, price: m.livePrice } : null;
+}
+
 // ---------- start ----------
 
 async function main() {
   try {
-    S.cfg = await loadConfig();
+    S.baseCfg = await loadConfig();
+    S.cfg = S.baseCfg;
+    const override = store.get("configOverride");
+    if (override && !validate(override).length) {
+      S.cfg = override;
+      S.overrideActive = true;
+      setBanner("override", "warn", null, `Using settings changed in this browser only (not saved to GitHub).
+        <button class="btn mini" id="discard-override">Go back to the saved settings</button>`);
+      $("discard-override").addEventListener("click", discardOverride);
+    } else if (override) {
+      store.set("configOverride", null);
+    }
   } catch (e) {
     setBanner("config", "error", e instanceof ConfigError ? e.message : `Could not start: ${e.message}`);
     $("status-text").textContent = "Error";
@@ -288,7 +353,9 @@ async function main() {
   }
   theme.init(S.cfg);
   theme.onChange(() => S.detail?.applyTheme());
-  S.coins = enabledSymbols(S.cfg);
+  S.allCoins = enabledSymbols(S.cfg);
+  applyCoinPrefs();
+  tooltip.init(S.cfg, resolveHelp);
   const opts = S.cfg.refresh.options_sec;
   const savedSec = store.get("refreshSec");
   S.intervalSec = opts.includes(savedSec) ? savedSec : S.cfg.refresh.default_sec;
@@ -297,7 +364,7 @@ async function main() {
   S.sort = store.get("sort", "score");
 
   // A change of connection state shows at once in the header and the Data feed tile.
-  S.feed = new Feed(S.cfg, S.coins, () => {
+  S.feed = new Feed(S.cfg, S.allCoins, () => {
     updateStatus();
     const view = $("view");
     if (S.loaded && view.querySelector("#feed")) view.querySelector("#feed").innerHTML =

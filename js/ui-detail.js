@@ -63,7 +63,7 @@ function ruleRows(res, cfg) {
     const pts = v * w[r];
     const vote = v > 0 ? `<span class="up">▲ +1</span>` : v < 0 ? `<span class="down">▼ −1</span>` : `<span class="flat">● 0</span>`;
     const [name, helpKey, sub] = meta[r];
-    return `<tr><td><div class="rule">${esc(name)} ${help(helpKey)}</div><div class="sub">${esc(sub)}</div></td>
+    return `<tr><td><div class="rule">${esc(name)} ${help(helpKey, res.symbol ?? "")}</div><div class="sub">${esc(sub)}</div></td>
       <td class="vote">${vote}</td><td class="pts num ${pts > 0 ? "up" : pts < 0 ? "down" : ""}">${pts > 0 ? "+" : pts < 0 ? "−" : ""}${Math.abs(pts)}</td></tr>`;
   }).join("");
 }

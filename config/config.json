@@ -69,5 +69,7 @@
   "backtest": {
     "years": 2,
     "horizons_days": [7, 30]
-  }
+  },
+
+  "github": {"owner": "Zz3pTer", "repo": "crypto-monitor", "branch": "main"}
 }
