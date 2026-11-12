@@ -44,7 +44,20 @@ def _get(url: str, params: Optional[dict] = None, tries: int = 3):
 
 def binance_daily(cfg: dict, pair: str, days: int, now_ms: float) -> list[dict]:
     base = cfg["data"]["providers"]["binance"]["rest"]
-    rows = _get(f"{base}/api/v3/klines", {"symbol": pair, "interval": "1d", "limit": min(days + 1, 1000)})
+    rows: list[list] = []
+    want = days + 1                                          # +1: the still-open candle is dropped
+    end: Optional[int] = None
+    while len(rows) < want:                                  # Binance returns at most 1000 per request
+        params = {"symbol": pair, "interval": "1d", "limit": min(want - len(rows), 1000)}
+        if end is not None:
+            params["endTime"] = end
+        part = _get(f"{base}/api/v3/klines", params)
+        if not part:
+            break
+        rows = part + rows
+        if len(part) < params["limit"]:
+            break                                            # no older candles exist
+        end = part[0][0] - 1
     return [{"time": r[0], "close_time": r[0] + DAY_MS, "open": float(r[1]), "high": float(r[2]),
              "low": float(r[3]), "close": float(r[4]), "volume": float(r[5])}
             for r in rows if r[6] < now_ms][-days:]
@@ -99,11 +112,13 @@ def coinbase_daily(cfg: dict, symbol: str, days: int, now_ms: float) -> list[dic
 
 # ---------- Public entry points ----------
 
-def daily_candles(cfg: dict, coin: dict, now_ms: Optional[float] = None) -> tuple[list[dict], str]:
+def daily_candles(cfg: dict, coin: dict, now_ms: Optional[float] = None,
+                  days: Optional[int] = None) -> tuple[list[dict], str]:
     """Completed daily candles for one coin, from the main provider or the fallback.
-    Returns (candles, provider_name). Raises DataError if both fail."""
+    `days` defaults to data.lookback_days. Returns (candles, provider_name).
+    Raises DataError if both fail."""
     now_ms = now_ms if now_ms is not None else time.time() * 1000
-    days = cfg["data"]["lookback_days"]
+    days = days or cfg["data"]["lookback_days"]
     providers: list[tuple[str, Callable[[], list[dict]]]] = []
     for name in (cfg["data"]["history_provider"], cfg["data"].get("fallback_history_provider")):
         if name == "binance":

@@ -78,11 +78,18 @@ function historyStrip(hist) {
 
 function backtestBlock(bt) {
   if (!bt) return `<p class="muted">Backtest results appear after the first weekly backtest run.</p>`;
-  const h = (x) => (x == null ? "—" : `${Math.round(x * 100)}%`);
-  const rows = (bt.horizons ?? []).map((hz) => `<tr><td>${hz.days} days</td><td class="num">${h(hz.buy_hit_rate)}</td><td class="num">${h(hz.sell_hit_rate)}</td></tr>`).join("");
-  return `<p>Backtest (${esc(bt.period ?? "2 years")}, daily): ${bt.signal_changes ?? "—"} signal changes.</p>
+  if (bt.status !== "ok") return `<p class="muted">No backtest for this coin: ${esc(bt.message ?? "not enough history")}.</p>`;
+  const rate = (x, n) => (x == null ? `<span class="muted">—</span>` : `${Math.round(x * 100)}% <span class="muted">of ${n}</span>`);
+  const rows = (bt.horizons ?? []).map((hz) => `<tr><td>${hz.days} days</td><td class="num">${rate(hz.buy_hit_rate, hz.buy_count)}</td><td class="num">${rate(hz.sell_hit_rate, hz.sell_count)}</td></tr>`).join("");
+  const beat = bt.strategy_return_pct > bt.buy_hold_return_pct;
+  const range = bt.start && bt.end ? `${fmt.date(bt.start + "T12:00:00+08:00")} – ${fmt.date(bt.end + "T12:00:00+08:00")}` : esc(bt.period ?? "");
+  return `<p class="bt-range">${range} <span class="muted">(${esc(bt.period ?? "")}, daily)</span>${bt.short_history ? ` <span class="tag">shorter history</span>` : ""}</p>
     <table class="bt"><thead><tr><th>After</th><th>BUY right</th><th>SELL right</th></tr></thead><tbody>${rows}</tbody></table>
-    <p>Strategy ${fmt.pct(bt.strategy_return_pct)} vs buy-and-hold ${fmt.pct(bt.buy_hold_return_pct)}.</p>`;
+    <table class="bt"><tbody>
+      <tr><td>Following the signals</td><td class="num ${bt.strategy_return_pct >= 0 ? "up" : "down"}">${fmt.pct(bt.strategy_return_pct)}</td></tr>
+      <tr><td>Just holding</td><td class="num ${bt.buy_hold_return_pct >= 0 ? "up" : "down"}">${fmt.pct(bt.buy_hold_return_pct)}</td></tr>
+    </tbody></table>
+    <p class="muted">${bt.signal_changes} signal changes, ${bt.trades} trades, in the market ${Math.round(bt.time_in_market_pct)}% of the time. Following the signals did ${beat ? "better" : "worse"} than holding. Past results do not predict future results.</p>`;
 }
 
 // ---------- the screen ----------
@@ -150,7 +157,10 @@ export class DetailView {
           <div class="panel">
             <h3>Signal history (last 30 days)</h3>
             <div id="history"><p class="muted">Loading…</p></div>
-            <div id="backtest"></div>
+          </div>
+          <div class="panel">
+            <h3>Backtest ${help("Backtest", c.symbol)}</h3>
+            <div id="backtest"><p class="muted">Loading…</p></div>
           </div>
         </aside>
       </section>`;

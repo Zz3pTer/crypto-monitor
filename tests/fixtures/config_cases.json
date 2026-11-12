@@ -1,6 +1,9 @@
 {
   "about": "Changes applied to config/config.json; each must produce a problem containing 'expect'. Checked by both tests/test_config.py and tests/config.test.js.",
   "cases": [
+    {"op": "set",    "path": ["backtest", "years"], "value": 0, "expect": "backtest.years must be a number from 0.5 to 10"},
+    {"op": "set",    "path": ["backtest", "horizons_days"], "value": [7, 2.5], "expect": "backtest.horizons_days must be a list"},
+    {"op": "set",    "path": ["backtest", "fee_pct"], "value": -1, "expect": "backtest.fee_pct must be a percentage"},
     {"op": "set",    "path": ["signal", "weights", "trend"], "value": 30, "expect": "add up to 110"},
     {"op": "set",    "path": ["signal", "weights", "rsi"], "value": "15", "expect": "signal.weights.rsi must be a number"},
     {"op": "set",    "path": ["signal", "periods", "rsi"], "value": 0, "expect": "signal.periods.rsi must be a positive number"},

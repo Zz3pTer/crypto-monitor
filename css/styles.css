@@ -536,3 +536,5 @@ footer {
   .spark { height: 48px; }
   .toolbar .search { flex: 1; min-width: 0; }
 }
+.bt-range { margin: 0 0 4px; }
+.bt td.up { color: var(--buy); } .bt td.down { color: var(--sell); }

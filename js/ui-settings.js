@@ -198,6 +198,15 @@ function sharedTab() {
         <label class="field"><span>Warn if official signals older than (hours)</span>${num("data.official_stale_hours", d.data.official_stale_hours)}</label>
       </div>
     </details>
+
+    <details><summary>Backtest</summary>
+      <div class="grid2">
+        <label class="field"><span>Years replayed</span>${num("backtest.years", d.backtest?.years ?? 2, 'step="0.5" min="0.5" max="10"')}</label>
+        <label class="field"><span>Fee per trade (%)</span>${num("backtest.fee_pct", d.backtest?.fee_pct ?? 0.1, 'step="any" min="0"')}</label>
+      </div>
+      <label class="field"><span>Check BUY/SELL after (days, comma-separated)</span><input class="btn wide" data-list="backtest.horizons_days" value="${esc((d.backtest?.horizons_days ?? [7, 30]).join(", "))}"></label>
+      <p class="muted">The backtest runs every Sunday at 09:00 MYT, or by hand from the Actions tab on GitHub.</p>
+    </details>
     ${tokenBlock()}`;
 }
 
@@ -250,7 +259,7 @@ function showProblems() {
 function setPath(obj, path, value) {
   const keys = path.split(".");
   let o = obj;
-  for (const k of keys.slice(0, -1)) o = o[/^\d+$/.test(k) ? Number(k) : k];
+  for (const k of keys.slice(0, -1)) o = (o[/^\d+$/.test(k) ? Number(k) : k] ??= {});
   o[keys.at(-1)] = value;
 }
 

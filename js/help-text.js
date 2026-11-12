@@ -115,6 +115,16 @@ export function helpFor(key, cfg) {
       ],
       now: (res) => `${res.indicators.vol_ratio.toFixed(2)}× — ${voteWord(res.votes.volume)}`,
     },
+    "Backtest": {
+      short: "Backtest", full: `The rules replayed over the past ${cfg.backtest?.years ?? 2} years`,
+      what: "Shows how these exact rules would have done in the past. Every day the signal turned BUY or SELL counts once. Each day only uses the prices known on that day.",
+      ranges: [
+        ["bull", "BUY right: the price was higher N days later"],
+        ["bear", "SELL right: the price was lower N days later"],
+        ["neutral", `Following the signals: buy when it turns BUY, sell when it turns SELL, ${cfg.backtest?.fee_pct ?? 0.1}% fee per trade, compared with just holding the coin. Past results do not predict future results.`],
+      ],
+      now: () => "Results for this coin — see the table",
+    },
   };
   return entries[key] ?? null;
 }

@@ -9,7 +9,7 @@ A live dashboard of crypto prices with rule-based **BUY / HOLD / SELL** signals,
 > Signals are the mechanical output of technical-analysis rules applied to price history.
 > They are information only, **not financial advice**.
 
-> **Status:** under construction (steps 0–5 of 10 done). Sections marked *(coming)* describe later steps.
+> **Status:** under construction (steps 0–9 of 10 done).
 
 ---
 
@@ -126,6 +126,15 @@ An alert fires once when the price crosses its target, and again only after the 
 |---|---|---|
 | `years` | Years of history replayed | `2` |
 | `horizons_days` | Check whether BUY/SELL were right after these many days | `[7, 30]` |
+| `fee_pct` | Cost of each buy or sell in the "following the signals" result, in percent | `0.1` |
+
+How the backtest works (`python/backtest.py`, results in `data/backtest.json`, shown on each coin's detail screen):
+
+- **Hit rate:** every day the official signal *turns* BUY (or SELL) counts once. A BUY was right after N days if the close N days later is higher; a SELL was right if it is lower. Signals too close to today to have an N-day result are left out.
+- **Following the signals:** buy at the close of a day the signal turns BUY, sell at the close of a day it turns SELL; HOLD keeps whatever you have. Compared with **just holding** from the first to the last day.
+- Each day only uses prices known on that day. Past results do not predict future results.
+
+Run it by hand with `python python/backtest.py` (or `python python/backtest.py BTC SOL` for some coins only).
 
 ---
 
@@ -167,7 +176,7 @@ If the bot token is ever exposed, revoke it in @BotFather (`/revoke`) and update
 |---|---|---|
 | `daily-signal.yml` | Every 15 min (:10, :25, :40, :55) and on manual run | Report on the first run after `telegram.report_time`; alerts in between; commits `data/` when it changes |
 | `tests.yml` | Every push and pull request | Python tests, JavaScript tests, JS/Python match check |
-| `backtest-weekly.yml` | Sundays 09:00 MYT and on manual run | Backtest, saves `data/backtest.json` (step 9) |
+| `backtest-weekly.yml` | Sundays 09:00 MYT and on manual run | Backtest, saves `data/backtest.json` |
 
 **Manual run:** GitHub → Actions → daily-signal → Run workflow, then pick a mode:
 - `test`: sends the report now prefixed `[TEST]` and saves nothing;
@@ -188,7 +197,7 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest          # Python tests
 npm test                                # JavaScript tests + JS/Python match check
 .venv\Scripts\python tests\make_fixtures.py --offline   # after changing the signal engine: refresh expected results
-py -3.12 -m http.server 8000            # preview the dashboard at http://localhost:8000 (coming)
+py -3.12 -m http.server 8000            # preview the dashboard at http://localhost:8000
 ```
 
 ## Project layout
@@ -199,5 +208,5 @@ config/                     config.json (settings), keys.example.json, keys.json
 data/                       signals.json, history/, backtest.json, state.json (written by the workflow)
 python/                     daily job, signal engine, backtest
 tests/                      Python and JavaScript tests, shared JS/Python test file
-.github/workflows/          daily-signal.yml, tests.yml, backtest-weekly.yml (coming)
+.github/workflows/          daily-signal.yml, tests.yml, backtest-weekly.yml
 ```

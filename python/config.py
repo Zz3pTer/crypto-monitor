@@ -124,6 +124,18 @@ def validate(cfg: dict) -> list[str]:
         if len(levels) != 1 or not _is_num(t[levels[0]]) or t[levels[0]] <= 0:
             problems.append(f'{label}: needs exactly one of "above" or "below" with a positive price')
 
+    bt = cfg.get("backtest", {})   # optional section: defaults are used when it is missing
+    if not isinstance(bt, dict):
+        problems.append('"backtest" must be an object')
+        bt = {}
+    if "years" in bt and not (_is_num(bt["years"]) and 0.5 <= bt["years"] <= 10):
+        problems.append("backtest.years must be a number from 0.5 to 10")
+    hz = bt.get("horizons_days", [7, 30])
+    if not isinstance(hz, list) or not hz or not all(isinstance(h, int) and not isinstance(h, bool) and h > 0 for h in hz):
+        problems.append("backtest.horizons_days must be a list of positive whole days")
+    if "fee_pct" in bt and not (_is_num(bt["fee_pct"]) and 0 <= bt["fee_pct"] < 10):
+        problems.append("backtest.fee_pct must be a percentage from 0 to under 10")
+
     return problems
 
 

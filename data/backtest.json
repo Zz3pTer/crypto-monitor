@@ -1,0 +1,388 @@
+{
+  "generated_at": "2026-11-12T11:10:29+08:00",
+  "timezone": "Asia/Kuala_Lumpur",
+  "settings": {
+    "years": 2,
+    "horizons_days": [
+      7,
+      30
+    ],
+    "fee_pct": 0.1
+  },
+  "method": "Hit rate: share of BUY (SELL) signals followed by a higher (lower) close after N days. Strategy: buy when the signal turns BUY, sell when it turns SELL, fee per trade. Past results do not predict future results.",
+  "summary": {
+    "coins": 9,
+    "horizons": [
+      {
+        "days": 7,
+        "buy_count": 293,
+        "buy_hit_rate": 0.3754,
+        "sell_count": 409,
+        "sell_hit_rate": 0.5086
+      },
+      {
+        "days": 30,
+        "buy_count": 270,
+        "buy_hit_rate": 0.3148,
+        "sell_count": 401,
+        "sell_hit_rate": 0.4688
+      }
+    ],
+    "beat_buy_hold": 4,
+    "avg_strategy_return_pct": -35.25,
+    "avg_buy_hold_return_pct": -21.25
+  },
+  "assets": [
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 189,
+      "buy_signals": 53,
+      "sell_signals": 41,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 53,
+          "buy_hit_rate": 0.3962,
+          "buy_avg_change_pct": -0.72,
+          "sell_count": 41,
+          "sell_hit_rate": 0.3415,
+          "sell_avg_change_pct": 1.22
+        },
+        {
+          "days": 30,
+          "buy_count": 46,
+          "buy_hit_rate": 0.3696,
+          "buy_avg_change_pct": -2.12,
+          "sell_count": 41,
+          "sell_hit_rate": 0.3415,
+          "sell_avg_change_pct": 2.22
+        }
+      ],
+      "strategy_return_pct": -15.16,
+      "buy_hold_return_pct": -15.85,
+      "trades": 9,
+      "time_in_market_pct": 53.5,
+      "still_holding": true,
+      "provider": "binance"
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 140,
+      "buy_signals": 34,
+      "sell_signals": 36,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 34,
+          "buy_hit_rate": 0.4706,
+          "buy_avg_change_pct": -0.28,
+          "sell_count": 35,
+          "sell_hit_rate": 0.5429,
+          "sell_avg_change_pct": 0.05
+        },
+        {
+          "days": 30,
+          "buy_count": 29,
+          "buy_hit_rate": 0.3448,
+          "buy_avg_change_pct": -3.34,
+          "sell_count": 35,
+          "sell_hit_rate": 0.4286,
+          "sell_avg_change_pct": 0.1
+        }
+      ],
+      "strategy_return_pct": -7.53,
+      "buy_hold_return_pct": -36.61,
+      "trades": 6,
+      "time_in_market_pct": 38.0,
+      "still_holding": false,
+      "provider": "binance"
+    },
+    {
+      "symbol": "SOL",
+      "name": "Solana",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 152,
+      "buy_signals": 26,
+      "sell_signals": 50,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 26,
+          "buy_hit_rate": 0.5,
+          "buy_avg_change_pct": 0.51,
+          "sell_count": 50,
+          "sell_hit_rate": 0.4,
+          "sell_avg_change_pct": 2.92
+        },
+        {
+          "days": 30,
+          "buy_count": 23,
+          "buy_hit_rate": 0.6522,
+          "buy_avg_change_pct": 1.13,
+          "sell_count": 50,
+          "sell_hit_rate": 0.5,
+          "sell_avg_change_pct": 1.87
+        }
+      ],
+      "strategy_return_pct": -40.3,
+      "buy_hold_return_pct": -60.65,
+      "trades": 7,
+      "time_in_market_pct": 37.3,
+      "still_holding": true,
+      "provider": "binance"
+    },
+    {
+      "symbol": "ADA",
+      "name": "Cardano",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 146,
+      "buy_signals": 27,
+      "sell_signals": 46,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 27,
+          "buy_hit_rate": 0.3333,
+          "buy_avg_change_pct": -3.41,
+          "sell_count": 44,
+          "sell_hit_rate": 0.4773,
+          "sell_avg_change_pct": 3.32
+        },
+        {
+          "days": 30,
+          "buy_count": 27,
+          "buy_hit_rate": 0.2222,
+          "buy_avg_change_pct": -12.57,
+          "sell_count": 42,
+          "sell_hit_rate": 0.4524,
+          "sell_avg_change_pct": 2.99
+        }
+      ],
+      "strategy_return_pct": -74.0,
+      "buy_hold_return_pct": -69.43,
+      "trades": 10,
+      "time_in_market_pct": 32.5,
+      "still_holding": false,
+      "provider": "binance"
+    },
+    {
+      "symbol": "XLM",
+      "name": "Stellar",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 125,
+      "buy_signals": 27,
+      "sell_signals": 37,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 27,
+          "buy_hit_rate": 0.3333,
+          "buy_avg_change_pct": 1.39,
+          "sell_count": 36,
+          "sell_hit_rate": 0.6111,
+          "sell_avg_change_pct": 0.77
+        },
+        {
+          "days": 30,
+          "buy_count": 27,
+          "buy_hit_rate": 0.1852,
+          "buy_avg_change_pct": -7.44,
+          "sell_count": 33,
+          "sell_hit_rate": 0.4848,
+          "sell_avg_change_pct": 2.78
+        }
+      ],
+      "strategy_return_pct": -52.3,
+      "buy_hold_return_pct": 9.52,
+      "trades": 14,
+      "time_in_market_pct": 40.1,
+      "still_holding": false,
+      "provider": "binance"
+    },
+    {
+      "symbol": "XRP",
+      "name": "XRP",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 151,
+      "buy_signals": 32,
+      "sell_signals": 44,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 32,
+          "buy_hit_rate": 0.3438,
+          "buy_avg_change_pct": -1.62,
+          "sell_count": 44,
+          "sell_hit_rate": 0.6136,
+          "sell_avg_change_pct": -0.33
+        },
+        {
+          "days": 30,
+          "buy_count": 29,
+          "buy_hit_rate": 0.3448,
+          "buy_avg_change_pct": -2.15,
+          "sell_count": 43,
+          "sell_hit_rate": 0.5581,
+          "sell_avg_change_pct": 2.15
+        }
+      ],
+      "strategy_return_pct": 55.19,
+      "buy_hold_return_pct": 49.49,
+      "trades": 11,
+      "time_in_market_pct": 47.9,
+      "still_holding": true,
+      "provider": "binance"
+    },
+    {
+      "symbol": "ALGO",
+      "name": "Algorand",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 187,
+      "buy_signals": 30,
+      "sell_signals": 64,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 30,
+          "buy_hit_rate": 0.2333,
+          "buy_avg_change_pct": -1.74,
+          "sell_count": 62,
+          "sell_hit_rate": 0.5161,
+          "sell_avg_change_pct": 2.45
+        },
+        {
+          "days": 30,
+          "buy_count": 28,
+          "buy_hit_rate": 0.1429,
+          "buy_avg_change_pct": -15.6,
+          "sell_count": 61,
+          "sell_hit_rate": 0.4754,
+          "sell_avg_change_pct": 5.79
+        }
+      ],
+      "strategy_return_pct": -67.08,
+      "buy_hold_return_pct": -42.05,
+      "trades": 14,
+      "time_in_market_pct": 29.8,
+      "still_holding": false,
+      "provider": "binance"
+    },
+    {
+      "symbol": "HBAR",
+      "name": "Hedera",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 148,
+      "buy_signals": 27,
+      "sell_signals": 47,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 27,
+          "buy_hit_rate": 0.4074,
+          "buy_avg_change_pct": 2.11,
+          "sell_count": 46,
+          "sell_hit_rate": 0.587,
+          "sell_avg_change_pct": 2.41
+        },
+        {
+          "days": 30,
+          "buy_count": 26,
+          "buy_hit_rate": 0.1923,
+          "buy_avg_change_pct": -7.6,
+          "sell_count": 45,
+          "sell_hit_rate": 0.5556,
+          "sell_avg_change_pct": 13.4
+        }
+      ],
+      "strategy_return_pct": -51.6,
+      "buy_hold_return_pct": 1.27,
+      "trades": 8,
+      "time_in_market_pct": 33.1,
+      "still_holding": false,
+      "provider": "binance"
+    },
+    {
+      "symbol": "LINK",
+      "name": "Chainlink",
+      "status": "ok",
+      "start": "2024-11-13",
+      "end": "2026-11-12",
+      "days": 729,
+      "period": "2.0 years",
+      "short_history": false,
+      "signal_changes": 174,
+      "buy_signals": 37,
+      "sell_signals": 51,
+      "horizons": [
+        {
+          "days": 7,
+          "buy_count": 37,
+          "buy_hit_rate": 0.3514,
+          "buy_avg_change_pct": -3.01,
+          "sell_count": 51,
+          "sell_hit_rate": 0.5098,
+          "sell_avg_change_pct": 0.55
+        },
+        {
+          "days": 30,
+          "buy_count": 35,
+          "buy_hit_rate": 0.3714,
+          "buy_avg_change_pct": -4.11,
+          "sell_count": 51,
+          "sell_hit_rate": 0.4118,
+          "sell_avg_change_pct": 1.91
+        }
+      ],
+      "strategy_return_pct": -64.5,
+      "buy_hold_return_pct": -26.95,
+      "trades": 13,
+      "time_in_market_pct": 37.2,
+      "still_holding": true,
+      "provider": "binance"
+    }
+  ]
+}

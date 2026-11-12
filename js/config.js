@@ -95,6 +95,13 @@ export function validate(cfg) {
     }
   });
 
+  let bt = cfg.backtest ?? {};   // optional section: defaults are used when it is missing
+  if (!isObj(bt)) { problems.push('"backtest" must be an object'); bt = {}; }
+  if ("years" in bt && !(isNum(bt.years) && bt.years >= 0.5 && bt.years <= 10)) problems.push("backtest.years must be a number from 0.5 to 10");
+  const hz = bt.horizons_days ?? [7, 30];
+  if (!Array.isArray(hz) || !hz.length || !hz.every((h) => Number.isInteger(h) && h > 0)) problems.push("backtest.horizons_days must be a list of positive whole days");
+  if ("fee_pct" in bt && !(isNum(bt.fee_pct) && bt.fee_pct >= 0 && bt.fee_pct < 10)) problems.push("backtest.fee_pct must be a percentage from 0 to under 10");
+
   return problems;
 }
 
