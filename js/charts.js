@@ -137,6 +137,20 @@ export class PriceChart {
   // shortly after, for the glide after a flick), unless the page made it.
   touched(ms = 1200) {
     this._userUntil = performance.now() + ms;
+    this._lastMove = performance.now();
+  }
+
+  // Resolves once no finger or mouse button is down and the view has been
+  // still for a moment. New candles are only swapped in then: the chart
+  // library tracks a pinch or drag by candle position, so changing the
+  // candles mid-gesture would make the view jump back.
+  idle() {
+    // A wheel holds no gesture state, so its zoom can carry on over new candles at once.
+    const still = () => !this._fingers && !this._mouse && (this._lastInput === "wheel" || performance.now() - (this._lastMove ?? 0) > 250);
+    return new Promise((resolve) => {
+      const check = () => (still() ? resolve() : setTimeout(check, 80));
+      check();
+    });
   }
 
   quiet(fn) {
@@ -166,6 +180,7 @@ export class PriceChart {
     }
     const t = performance.now();
     const user = t < (this._userUntil ?? 0) && t > this._quietUntil;
+    if (user) this._lastMove = t;                    // still gliding after a flick
     this.showPill(r, user);
     if (this._viewFrame) return;
     this._viewFrame = requestAnimationFrame(() => {
@@ -221,7 +236,7 @@ export class PriceChart {
     let lastX = null, lastDist = null, mouseDown = false, wheelTimer = null;
 
     const push = (side, amount) => {
-      if (side === "left" && this.moreOlder) { this.onNeedOlder?.(); return; }
+      if (side === "left" && this.moreOlder) { this.setLoading(true); this.onNeedOlder?.(); return; }
       this.pull[side] = Math.min(160, this.pull[side] + amount);
       const k = this.pull[side] / 160;
       const g = this.glow[side];
@@ -254,6 +269,8 @@ export class PriceChart {
 
     on(el, "touchstart", (e) => {
       this.touched();
+      this._lastInput = "touch";
+      this._fingers = e.touches.length;
       lastX = e.touches.length === 1 ? e.touches[0].clientX : null;
       lastDist = e.touches.length === 2 ? dist(e.touches) : null;
     });
@@ -269,21 +286,22 @@ export class PriceChart {
         lastDist = d;
       }
     });
-    for (const ev of ["touchend", "touchcancel"]) on(el, ev, () => { this.touched(1500); lastX = lastDist = null; release(); });
+    for (const ev of ["touchend", "touchcancel"]) on(el, ev, (e) => { this.touched(1500); this._fingers = e.touches.length; lastX = lastDist = null; release(); });
 
-    on(el, "mousedown", (e) => { this.touched(); mouseDown = true; lastX = e.clientX; });
+    on(el, "mousedown", (e) => { this.touched(); this._lastInput = "mouse"; mouseDown = this._mouse = true; lastX = e.clientX; });
     this._onMouseMove = (e) => {
       if (!mouseDown) return;
       this.touched();
       moveBy(e.clientX - lastX);
       lastX = e.clientX;
     };
-    this._onMouseUp = () => { if (mouseDown) { mouseDown = false; release(); } };
+    this._onMouseUp = () => { if (mouseDown) { mouseDown = this._mouse = false; release(); } };
     window.addEventListener("mousemove", this._onMouseMove);
     window.addEventListener("mouseup", this._onMouseUp);
 
     on(el, "wheel", (e) => {
       this.touched(600);
+      this._lastInput = "wheel";
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) moveBy(-e.deltaX / 2);
       else if (e.deltaY > 0) zoomOutAtFull(e.deltaY / 4);
       clearTimeout(wheelTimer);

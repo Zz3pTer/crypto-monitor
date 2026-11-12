@@ -323,6 +323,7 @@ export class DetailView {
       this.chart.fit(this.shownBars);
       this.applyMarkers();
       this.updateTitle();
+      if (this.moreOlder) this.loadOlder();                  // ready before anyone zooms out
     } catch (e) {
       if (gen === this.gen) title.textContent = `Price — could not load ${iv.name} candles (${e.message})`;
     }
@@ -344,11 +345,19 @@ export class DetailView {
     if (!v.user) return;
     if (this.range) { this.range = null; this.tfButtons(); }      // free zooming: no period button is lit
     this.updateTitle();
-    if (v.from < 8 && this.moreOlder) this.loadOlder();
-    if (this.busy || Math.abs(shown - before) < 0.5) return;
-    const vt = this.visibleTimes();
-    const next = vt && R.nextInterval(this.tf, shown, shown > before, vt.t0, this.chart.width());
-    if (next && next !== this.tf) this.switchInterval(next);
+    if (v.from < Math.max(20, shown) && this.moreOlder) this.loadOlder();   // about one screen before the edge
+    if (Math.abs(shown - before) < 0.5) return;
+    this.zoomingOut = shown > before;
+    this.maybeSwitch();
+  }
+
+  // Bigger or smaller candles if the zoom calls for it.
+  maybeSwitch() {
+    if (this.busy || this.zoomingOut == null || !this.chart) return;
+    const v = this.chart.visible(), vt = this.visibleTimes();
+    if (!v || !vt) return;
+    const next = R.nextInterval(this.tf, v.to - v.from, this.zoomingOut, vt.t0, this.chart.width());
+    if (next !== this.tf) this.switchInterval(next);
     else this.tfButtons();
   }
 
@@ -356,19 +365,22 @@ export class DetailView {
   async switchInterval(key) {
     const vt = this.visibleTimes();
     if (!vt || this.busy) return;
-    const want = Math.min(R.barsSince(vt.t0, key), R.MAX_BARS);
-    const atLatest = this.chart.atRight();
-    const end = atLatest ? Infinity : (vt.b.closeTime ?? vt.t1);
+    // One more screen of history to the left, so zooming out can go on.
+    const want = Math.min(R.barsSince(vt.t0 - (vt.t1 - vt.t0), key), R.MAX_BARS);
     this.busy = true;
     const gen = ++this.gen;
     try {
       const bars = await this.ctx.feed.klines(this.ctx.coin.pair, R.intervalOf(key).api, want);
+      await this.chart?.idle();
       if (gen !== this.gen || !this.chart) return;
+      const now = this.visibleTimes() ?? vt;                  // the dates on screen once the gesture ended
+      const end = this.chart.atRight() ? Infinity : (now.b.closeTime ?? now.t1);
       this.tf = key;
+      this.zoomingOut = null;
       store.set("detailTf", key);
       this.setBars(bars, want);
       this.chart.setData(bars, this.ctx.cfg.signal);
-      this.chart.showTimes(vt.t0 / 1000, end / 1000);      // the same dates; still at the latest candle if it was
+      this.chart.showTimes(now.t0 / 1000, end / 1000);     // the same dates; still at the latest candle if it was
       this.tfButtons();
       this.applyMarkers();
       this.updateTitle();
@@ -381,11 +393,11 @@ export class DetailView {
   async loadOlder() {
     if (this.busy || !this.moreOlder || !this.tfBars?.length) return;
     this.busy = true;
-    this.chart.setLoading(true);
     const gen = ++this.gen;
     try {
       const iv = R.intervalOf(this.tf);
       const older = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, 1000, this.tfBars[0].time - 1);
+      await this.chart?.idle();
       if (gen !== this.gen || !this.chart) return;
       const merged = R.mergeBars(older, this.tfBars);
       this.tfBars = merged;
@@ -398,6 +410,7 @@ export class DetailView {
       this.busy = false;
       this.chart?.setLoading(false);
     }
+    this.maybeSwitch();                                    // a zoom that happened while loading
   }
 
   // Every few minutes: fetch the latest candles and add them, keeping the view.
