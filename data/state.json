@@ -1,4 +1,22 @@
 {
-  "alert_states": {},
-  "live_signals": {}
+  "alert_states": {
+    "BTC:above:80000": {
+      "armed": true
+    },
+    "BTC:below:60000": {
+      "armed": true
+    }
+  },
+  "live_signals": {
+    "BTC": "HOLD",
+    "ETH": "HOLD",
+    "SOL": "HOLD",
+    "ADA": "HOLD",
+    "XLM": "HOLD",
+    "XRP": "HOLD",
+    "ALGO": "SELL",
+    "HBAR": "HOLD",
+    "LINK": "HOLD"
+  },
+  "last_report_date": "2026-11-12"
 }
