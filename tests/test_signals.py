@@ -9,7 +9,7 @@ import signals as S
 
 @pytest.fixture(scope="module")
 def sig():
-    return C.load_config()["signal"]
+    return C.load_config(C.ROOT / "tests" / "fixtures" / "config_base.json")["signal"]
 
 
 def make_candles(closes, volumes=None):

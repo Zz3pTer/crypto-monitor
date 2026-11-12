@@ -65,7 +65,7 @@ def build_expected(cfg: dict, raw: dict) -> dict:
 
 
 def main() -> None:
-    cfg = C.load_config()
+    cfg = C.load_config(C.ROOT / "tests" / "fixtures" / "config_base.json")
     if "--offline" in sys.argv:
         raw = json.loads(CANDLES.read_text(encoding="utf-8"))["assets"]
     else:

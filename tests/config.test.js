@@ -5,7 +5,9 @@ import { readFileSync } from "node:fs";
 import { validate, enabledSymbols } from "../js/config.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
-const base = read("../config/config.json");
+// Tests use a fixed copy, so coins added on the website never break them.
+const live = read("../config/config.json");
+const base = read("./fixtures/config_base.json");
 const { cases } = read("./fixtures/config_cases.json");
 
 function applyCase(cfg, c) {
@@ -17,9 +19,10 @@ function applyCase(cfg, c) {
   else if (c.op === "delete") delete node[last];
 }
 
-test("repo config is valid", () => assert.deepEqual(validate(base), []));
+test("repo config is valid", () => assert.deepEqual(validate(live), []));
+test("test config is valid", () => assert.deepEqual(validate(base), []));
 
-test("starting coin list", () => {
+test("test config holds the original nine coins", () => {
   assert.deepEqual(enabledSymbols(base).map((s) => s.symbol), ["BTC", "ETH", "SOL", "ADA", "XLM", "XRP", "ALGO", "HBAR", "LINK"]);
 });
 

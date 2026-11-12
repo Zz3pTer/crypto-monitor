@@ -1,0 +1,76 @@
+{
+  "symbols": [
+    {"symbol": "BTC",  "name": "Bitcoin",   "pair": "BTCUSDT",  "coingecko_id": "bitcoin",          "enabled": true},
+    {"symbol": "ETH",  "name": "Ethereum",  "pair": "ETHUSDT",  "coingecko_id": "ethereum",         "enabled": true},
+    {"symbol": "SOL",  "name": "Solana",    "pair": "SOLUSDT",  "coingecko_id": "solana",           "enabled": true},
+    {"symbol": "ADA",  "name": "Cardano",   "pair": "ADAUSDT",  "coingecko_id": "cardano",          "enabled": true},
+    {"symbol": "XLM",  "name": "Stellar",   "pair": "XLMUSDT",  "coingecko_id": "stellar",          "enabled": true},
+    {"symbol": "XRP",  "name": "XRP",       "pair": "XRPUSDT",  "coingecko_id": "ripple",           "enabled": true},
+    {"symbol": "ALGO", "name": "Algorand",  "pair": "ALGOUSDT", "coingecko_id": "algorand",         "enabled": true},
+    {"symbol": "HBAR", "name": "Hedera",    "pair": "HBARUSDT", "coingecko_id": "hedera-hashgraph", "enabled": true},
+    {"symbol": "LINK", "name": "Chainlink", "pair": "LINKUSDT", "coingecko_id": "chainlink",        "enabled": true}
+  ],
+
+  "refresh": {
+    "options_sec": [5, 10, 15, 30, 60, 300, 900],
+    "default_sec": 30,
+    "hidden_tab_sec": 300,
+    "polling_min_sec": 5
+  },
+
+  "theme": {"default": "dark"},
+  "timezone": "Asia/Kuala_Lumpur",
+
+  "data": {
+    "live_provider": "binance",
+    "history_provider": "binance",
+    "fallback_history_provider": "coinbase",
+    "quote": "USDT",
+    "lookback_days": 400,
+    "history_keep_days": 730,
+    "stale_after_intervals": 3,
+    "official_stale_hours": 26,
+    "providers": {
+      "binance":  {"rest": "https://data-api.binance.vision", "ws": "wss://data-stream.binance.vision"},
+      "coinbase": {"rest": "https://api.exchange.coinbase.com", "quote": "USD"}
+    }
+  },
+
+  "signal": {
+    "min_candles": 220,
+    "periods":    {"sma_fast": 50, "sma_slow": 200, "ema": 20, "rsi": 14, "bb": 20, "bb_std": 2,
+                   "macd_fast": 12, "macd_slow": 26, "macd_signal": 9, "roc": 14, "vol_avg": 20},
+    "weights":    {"trend": 20, "cross": 15, "macd": 20, "rsi": 15,
+                   "bollinger": 10, "momentum": 10, "volume": 10},
+    "thresholds": {"strong_buy": 65, "buy": 35, "sell": -35, "strong_sell": -65},
+    "hysteresis": 5,
+    "rsi_oversold": 30,
+    "rsi_overbought": 70,
+    "roc_pct": 5,
+    "volume_spike": 1.5,
+    "cross_lookback_days": 3
+  },
+
+  "telegram": {
+    "report_time": "08:10",
+    "dashboard_url": "https://zz3pter.github.io/crypto-monitor/",
+    "send_retries": 3
+  },
+
+  "alerts": {
+    "check": "daily",
+    "signal_change": true,
+    "targets": [
+      {"symbol": "BTC", "above": 80000},
+      {"symbol": "BTC", "below": 60000}
+    ]
+  },
+
+  "backtest": {
+    "years": 2,
+    "horizons_days": [7, 30],
+    "fee_pct": 0.1
+  },
+
+  "github": {"owner": "Zz3pTer", "repo": "crypto-monitor", "branch": "main"}
+}

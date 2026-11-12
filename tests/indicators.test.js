@@ -5,7 +5,7 @@ import * as ind from "../js/indicators.js";
 import { classify } from "../js/signals.js";
 import { readFileSync } from "node:fs";
 
-const sig = JSON.parse(readFileSync(new URL("../config/config.json", import.meta.url), "utf8")).signal;
+const sig = JSON.parse(readFileSync(new URL("./fixtures/config_base.json", import.meta.url), "utf8")).signal;
 
 test("sma", () => assert.deepEqual(ind.sma([1, 2, 3, 4, 5], 3), [null, null, 2, 3, 4]));
 test("ema seeded with sma", () => assert.deepEqual(ind.ema([2, 4, 6, 8], 3), [null, null, 4, 6]));

@@ -86,7 +86,7 @@ def test_period_is_limited_to_the_configured_years(fake_signals):
 
 
 def test_not_enough_history():
-    cfg = json.loads((Path(__file__).parents[1] / "config/config.json").read_text())
+    cfg = json.loads((FIX / "config_base.json").read_text())
     r = B.run_asset(make([1.0] * 100), cfg["signal"], BT)
     assert r["status"] == "insufficient_history"
 
@@ -98,7 +98,7 @@ def real_candles(sym="BTC"):
 
 
 def test_real_rules_on_fixture_data():
-    cfg = json.loads((Path(__file__).parents[1] / "config/config.json").read_text())
+    cfg = json.loads((FIX / "config_base.json").read_text())
     r = B.run_asset(real_candles(), cfg["signal"], {"years": 2, "horizons_days": [7, 30], "fee_pct": 0.1})
     assert r["status"] == "ok" and r["short_history"] is True      # the fixture has 500 days
     assert r["days"] == 500 - cfg["signal"]["min_candles"]
@@ -112,7 +112,7 @@ def test_real_rules_on_fixture_data():
 
 
 def test_run_reports_errors_and_summary(tmp_path):
-    cfg = json.loads((Path(__file__).parents[1] / "config/config.json").read_text())
+    cfg = json.loads((FIX / "config_base.json").read_text())
 
     class Fetch:
         def daily_candles(self, cfg, coin, now_ms, days):

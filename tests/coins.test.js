@@ -14,7 +14,7 @@ const { buildList, search } = await import("../js/coin-list.js");
 const coins = await import("../js/coins.js");
 const { validate, MAX_COINS } = await import("../js/config.js");
 
-const cfg = JSON.parse(readFileSync(new URL("../config/config.json", import.meta.url), "utf8"));
+const cfg = JSON.parse(readFileSync(new URL("./fixtures/config_base.json", import.meta.url), "utf8"));
 beforeEach(() => mem.clear());
 
 const pairOf = (b, q = "USDT", status = "TRADING") => ({ symbol: b + q, baseAsset: b, quoteAsset: q, status, isSpotTradingAllowed: true });
@@ -136,4 +136,25 @@ test("a change that breaks the config is not saved", async () => {
   };
   await assert.rejects(coins.changeShared(cfg, "t", (c) => coins.withCoin(c, { symbol: "BTC2", name: "", pair: "X" }), "x"), /needs a text "name"/);
   assert.equal(put, false);
+});
+
+test("GitHub is always asked afresh, never from the browser's cache", async () => {
+  const seen = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    seen.push(opts.cache);
+    if (!opts.method) return new Response(JSON.stringify({ sha: "abc", content: Buffer.from(JSON.stringify(cfg)).toString("base64") }), { status: 200 });
+    return new Response(JSON.stringify({ content: { sha: "def" }, commit: { html_url: "u" } }), { status: 200 });
+  };
+  await coins.changeShared(cfg, "t", (c) => coins.withCoin(c, doge), "x");
+  assert.deepEqual(seen, ["no-store", "no-store"]);
+});
+
+test("a save that clashes twice gives a clear message", async () => {
+  let reads = 0;
+  globalThis.fetch = async (url, opts = {}) => {
+    if (!opts.method) { reads++; return new Response(JSON.stringify({ sha: "abc", content: Buffer.from(JSON.stringify(cfg)).toString("base64") }), { status: 200 }); }
+    return new Response(JSON.stringify({ message: "config/config.json does not match abc" }), { status: 409 });
+  };
+  await assert.rejects(coins.changeShared(cfg, "t", (c) => coins.withCoin(c, doge), "x"), /same moment/);
+  assert.equal(reads, 2);
 });

@@ -71,7 +71,9 @@ export async function changeShared(cfg, token, change, message) {
       rememberSaved(next);
       return { cfg: next, commitUrl: res.commitUrl };
     } catch (e) {
-      if (e.status !== 409 || attempt) throw e;        // saved by someone else at that moment: read again
+      if (e.status !== 409) throw e;
+      if (attempt) throw new Error("Someone else saved the shared settings at the same moment. Please try again.");
+      // saved by someone else at that moment: read again
     }
   }
 }

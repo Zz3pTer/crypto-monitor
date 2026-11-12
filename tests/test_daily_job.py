@@ -57,7 +57,7 @@ class FakeFetch:
 
 @pytest.fixture
 def cfg():
-    return C.load_config()
+    return C.load_config(C.ROOT / "tests" / "fixtures" / "config_base.json")
 
 
 @pytest.fixture

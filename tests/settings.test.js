@@ -8,7 +8,7 @@ import { evaluate } from "../js/signals.js";
 import { validate } from "../js/config.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
-const cfg = read("../config/config.json");
+const cfg = read("./fixtures/config_base.json");
 
 test("saved config text reads back as exactly the same settings", () => {
   const text = formatConfig(cfg);

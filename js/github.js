@@ -18,7 +18,10 @@ export const getToken = () => store.get(TOKEN_KEY, null);
 export const setToken = (t) => store.set(TOKEN_KEY, t || null);
 
 async function api(path, token, opts = {}) {
+  // no-store: GitHub lets browsers reuse an answer for 60 s, which would give
+  // an old version id right after a save and make the next save fail.
   const res = await fetch(API + path, {
+    cache: "no-store",
     ...opts,
     headers: {
       Accept: "application/vnd.github+json",

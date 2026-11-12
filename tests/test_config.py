@@ -7,16 +7,24 @@ import pytest
 import config as C
 
 
+# Tests use a fixed copy, so coins added on the website never break them.
+BASE = C.ROOT / "tests" / "fixtures" / "config_base.json"
+
+
 @pytest.fixture
 def cfg():
-    return C.load_config()
+    return C.load_config(BASE)
 
 
-def test_repo_config_is_valid(cfg):
+def test_repo_config_is_valid():
+    assert C.validate(C.load_config()) == []
+
+
+def test_test_config_is_valid(cfg):
     assert C.validate(cfg) == []
 
 
-def test_starting_coin_list(cfg):
+def test_test_config_holds_original_nine_coins(cfg):
     assert [s["symbol"] for s in C.enabled_symbols(cfg)] == [
         "BTC", "ETH", "SOL", "ADA", "XLM", "XRP", "ALGO", "HBAR", "LINK"]
 
