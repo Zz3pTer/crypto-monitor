@@ -37,7 +37,7 @@ class FakeFetch:
     def __init__(self, broken=(), drop_last=0, live_factor=1.0):
         self.broken, self.drop_last, self.live_factor = set(broken), drop_last, live_factor
 
-    def daily_candles(self, cfg, coin, now_ms):
+    def daily_candles(self, cfg, coin, now_ms, days=None):
         if coin["symbol"] in self.broken:
             raise fetch_data.DataError("bad pair")
         return candles(coin["symbol"], self.drop_last), "binance"
@@ -252,3 +252,49 @@ def test_report_escapes_html_and_groups():
     now = datetime(2026, 11, 11, 8, 10, tzinfo=MYT)
     msg = tg.daily_report([a], now, now.replace(minute=0), "https://x", [])
     assert "X&lt;Y" in msg and "⬆ (was HOLD)" in msg and "X&lt;Y → BUY" in msg
+
+
+# ---------- coins added or removed (step 10) ----------
+
+def test_new_coin_is_backtested_in_the_daily_run(cfg, tmp_path, sent):
+    import backtest as B
+    btc = {"symbol": "BTC", **B.run_asset(candles("BTC"), cfg["signal"], B.settings(cfg)), "marker": 1}
+    old = {"generated_at": "x", "settings": {}, "assets": [btc, dict(btc, symbol="GONE")]}
+    (tmp_path / "backtest.json").write_text(json.dumps(old), encoding="utf-8")
+    make_job(cfg, tmp_path, sent).run()
+    bt = json.loads((tmp_path / "backtest.json").read_text(encoding="utf-8"))
+    assert [a["symbol"] for a in bt["assets"]] == [c["symbol"] for c in C.enabled_symbols(cfg)]
+    assert bt["assets"][0].get("marker") == 1                      # existing results kept as they are
+    assert all(a["status"] == "ok" for a in bt["assets"][1:])      # the others were worked out now
+    assert bt["summary"]["coins"] == len(bt["assets"])
+    assert len(sent) == 1
+
+
+def test_no_backtest_work_when_nothing_changed(cfg, tmp_path, sent):
+    syms = [c["symbol"] for c in C.enabled_symbols(cfg)]
+    old = {"assets": [{"symbol": s, "status": "ok"} for s in syms]}
+    (tmp_path / "backtest.json").write_text(json.dumps(old), encoding="utf-8")
+    job = make_job(cfg, tmp_path, sent)
+    job.run()
+    assert json.loads((tmp_path / "backtest.json").read_text(encoding="utf-8")) == old
+
+
+def test_backtest_trouble_does_not_stop_the_report(cfg, tmp_path, sent):
+    class NoHistory(FakeFetch):
+        def daily_candles(self, cfg, coin, now_ms, days=None):
+            if days:
+                raise RuntimeError("boom")
+            return super().daily_candles(cfg, coin, now_ms)
+    make_job(cfg, tmp_path, sent, fetch=NoHistory()).run()
+    assert len(sent) == 1 and (tmp_path / "signals.json").exists()
+
+
+def test_report_with_30_coins_fits_one_telegram_message(cfg):
+    assets = [{"symbol": f"1000C{i:02d}", "status": "ok", "signal": ("BUY", "HOLD", "SELL")[i % 3], "score": 90 - i * 6,
+               "close": 0.00001234 * (i + 1), "change_24h_pct": -12.34, "strong": True, "changed": True,
+               "previous_signal": "HOLD" if i % 3 != 1 else "BUY"} for i in range(30)]
+    now = datetime(2026, 11, 12, 8, 10, tzinfo=MYT)
+    text = tg.daily_report(assets, now, now, cfg["telegram"]["dashboard_url"],
+                           ["BTC rose above $80,000 (now $81,000)"] * 3)
+    assert len(text) < 4096                                        # Telegram's limit per message
+    assert all(f"1000C{i:02d}" in text for i in range(30))

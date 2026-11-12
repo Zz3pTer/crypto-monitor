@@ -10,6 +10,7 @@ import * as store from "./store.js";
 import * as fmt from "./format.js";
 import { validate } from "./config.js";
 import * as gh from "./github.js";
+import { viewCoins, removeLocal } from "./coins.js";
 
 const esc = fmt.escape;
 const LOCAL_KEYS = ["refreshSec", "slowHidden", "coinOrder", "hiddenCoins", "overlays", "filter", "sort", "detailTf", "paused"];
@@ -99,12 +100,12 @@ function browserTab() {
     <label class="field check"><input type="checkbox" data-local="slowHidden" ${store.get("slowHidden", true) ? "checked" : ""}>
       <span>Slow down when the tab is hidden (refresh every ${label(cfg.refresh.hidden_tab_sec ?? 300)})</span></label>
     <h3>Visible coins and order</h3>
-    <p class="muted">Tick to show; drag, or use the arrows, to change the order.</p>
+    <p class="muted">Tick to show; drag, or use the arrows, to change the order. <button class="btn mini" data-act="search-coin">+ Add coin</button></p>
     <ol class="coin-order" id="coin-order">${order.map((c, i) => `
       <li draggable="true" data-sym="${esc(c.symbol)}">
         <span class="grip" aria-hidden="true">☰</span>
-        <label><input type="checkbox" data-show="${esc(c.symbol)}" ${hidden.has(c.symbol) ? "" : "checked"}> <b>${esc(c.symbol)}</b> <span class="muted">${esc(c.name)}</span></label>
-        <span class="arrows"><button class="btn mini" data-move="-1" data-sym="${esc(c.symbol)}" aria-label="Move ${esc(c.symbol)} up" ${i === 0 ? "disabled" : ""}>↑</button><button class="btn mini" data-move="1" data-sym="${esc(c.symbol)}" aria-label="Move ${esc(c.symbol)} down" ${i === order.length - 1 ? "disabled" : ""}>↓</button></span>
+        <label><input type="checkbox" data-show="${esc(c.symbol)}" ${hidden.has(c.symbol) ? "" : "checked"}> <b>${esc(c.symbol)}</b> <span class="muted">${esc(c.name)}</span>${c.local ? ` <span class="tag" title="Not in the Telegram report">my view</span>` : ""}</label>
+        <span class="arrows"><button class="btn mini" data-move="-1" data-sym="${esc(c.symbol)}" aria-label="Move ${esc(c.symbol)} up" ${i === 0 ? "disabled" : ""}>↑</button><button class="btn mini" data-move="1" data-sym="${esc(c.symbol)}" aria-label="Move ${esc(c.symbol)} down" ${i === order.length - 1 ? "disabled" : ""}>↓</button>${c.local ? `<button class="btn mini" data-act="remove-local" data-sym="${esc(c.symbol)}" aria-label="Remove ${esc(c.symbol)} from my view">✕</button>` : ""}</span>
       </li>`).join("")}</ol>
     <h3>Signal rules in use</h3>
     <p class="muted">Weights ${Object.entries(cfg.signal.weights).map(([k, v]) => `${esc(WEIGHT_LABELS[k] ?? k)} ${v}`).join(" · ")}.
@@ -134,8 +135,8 @@ function sharedTab() {
           <td><input type="checkbox" data-path="symbols.${i}.enabled" ${c.enabled !== false ? "checked" : ""} aria-label="Enabled"></td>
           <td><button class="btn mini" data-act="del-coin" data-i="${i}" aria-label="Remove ${esc(c.symbol)}">✕</button></td></tr>`).join("")}</tbody>
       </table></div>
-      <button class="btn" data-act="add-coin">+ Add coin</button>
-      <p class="muted">The pair must exist on Binance (e.g. DOGEUSDT). A new coin shows its live price at once; its official signal appears after the next daily run.</p>
+      <button class="btn primary" data-act="search-coin">Search and add a coin</button> <button class="btn" data-act="add-coin">+ Add a row by hand</button>
+      <p class="muted">The pair must exist on Binance (e.g. DOGEUSDT). A new coin shows its live price at once; its official signal and the Telegram report include it from the next daily run.</p>
     </details>
 
     <details open><summary>Telegram report and alerts</summary>
@@ -350,6 +351,14 @@ async function onClick(e) {
     render();
   }
   if (act === "reload") location.reload();
+  if (act === "search-coin") {
+    if (S.dirty && !confirm("Discard your unsaved changes to the shared settings?")) return;
+    S.dirty = false; S.app.onAddCoin?.();
+  }
+  if (act === "remove-local") {
+    if (!confirm(`Remove ${b.dataset.sym} from your view?`)) return;
+    removeLocal(b.dataset.sym); location.reload();
+  }
 }
 
 function moveCoin(sym, dir) {
@@ -381,7 +390,7 @@ document.addEventListener("drop", (e) => {
 });
 
 export function orderedCoins(cfg) {
-  const coins = cfg.symbols.filter((c) => c.enabled !== false);
+  const coins = viewCoins(cfg);
   const order = store.get("coinOrder", []);
   const rank = (s) => { const i = order.indexOf(s); return i < 0 ? 1e6 + coins.findIndex((c) => c.symbol === s) : i; };
   return [...coins].sort((a, b) => rank(a.symbol) - rank(b.symbol));

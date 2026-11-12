@@ -9,7 +9,7 @@ A live dashboard of crypto prices with rule-based **BUY / HOLD / SELL** signals,
 > Signals are the mechanical output of technical-analysis rules applied to price history.
 > They are information only, **not financial advice**.
 
-> **Status:** under construction (steps 0–9 of 10 done).
+> **Status:** under construction (steps 0–10 of 11 done; step 11 is the go-live check).
 
 ---
 
@@ -42,7 +42,20 @@ Everything adjustable is in this one file. Both the dashboard and the daily job 
 
 Between 1 and 30 coins can be enabled.
 
-**Add a coin** — add one line, e.g. Dogecoin:
+### Adding and removing coins on the website
+
+Press **+ Add coin** on the overview (or *Search and add a coin* in Settings → Shared settings). Search any of the ~500 coins traded against USDT on Binance by name or symbol. Picking one shows its price, 24h change, 7-day chart, current signal and a quick backtest before you add it. Then:
+
+| Choice | Who can | Dashboard | Telegram report |
+|---|---|---|---|
+| **Add for everyone** | People with a GitHub token (Settings → Shared settings) | Everyone's, at once in your browser, for others within about a minute | From the next daily report |
+| **Add to my view only** | Anyone | This browser only (marked *my view*) | No |
+
+To remove a coin, open it and press **Manage coin**: *Remove for everyone* (token needed; its price targets go too) or *Remove from my view*. At most 30 coins are shown at a time.
+
+A coin added for everyone is changed in `config.json` by a commit from the dashboard. The next daily run includes it in the report and works out its backtest; until then the detail screen works the backtest out in the browser. Full names come from Binance's product list, with a saved copy in `data/coin-names.json` (refresh it with `python python/update_coin_names.py`).
+
+**Add a coin by hand** — add one line, e.g. Dogecoin:
 
 ```json
 {"symbol": "DOGE", "name": "Dogecoin", "pair": "DOGEUSDT", "coingecko_id": "dogecoin", "enabled": true},
@@ -205,7 +218,7 @@ py -3.12 -m http.server 8000            # preview the dashboard at http://localh
 ```
 index.html, css/, js/       dashboard
 config/                     config.json (settings), keys.example.json, keys.json (local only)
-data/                       signals.json, history/, backtest.json, state.json (written by the workflow)
+data/                       signals.json, history/, backtest.json, state.json (written by the workflow), coin-names.json
 python/                     daily job, signal engine, backtest
 tests/                      Python and JavaScript tests, shared JS/Python test file
 .github/workflows/          daily-signal.yml, tests.yml, backtest-weekly.yml

@@ -1,6 +1,6 @@
 // Dashboard entry point: loads config and official signals, starts the live
 // feed, and repaints at the chosen refresh interval (spec 3, 4.2, 5.2).
-import { loadConfig, enabledSymbols, validate, ConfigError } from "./config.js";
+import { loadConfig, validate, ConfigError } from "./config.js";
 import { evaluate } from "./signals.js";
 import { Feed } from "./data-source.js";
 import * as store from "./store.js";
@@ -10,6 +10,8 @@ import * as ov from "./ui-overview.js";
 import { DetailView } from "./ui-detail.js";
 import * as tooltip from "./tooltip.js";
 import * as settings from "./ui-settings.js";
+import * as coins from "./coins.js";
+import * as addCoin from "./ui-addcoin.js";
 
 const $ = (id) => document.getElementById(id);
 const SIGNALS_URL = "data/signals.json";
@@ -20,7 +22,7 @@ const S = {
   cfg: null,
   baseCfg: null,           // config.json as published (before any change tried in this browser)
   overrideActive: false,
-  allCoins: [],            // every enabled coin (the live feed follows all of them)
+  allCoins: [],            // every coin this browser shows: shared + "my view only" (the live feed follows all)
   coins: [],               // the coins shown, in this browser's order
   feed: null,
   official: null,          // contents of data/signals.json, or null
@@ -95,7 +97,7 @@ function models(coins = S.coins) {
     const okLive = live && live.status === "ok" ? live : null;
     const shown = okOff ?? okLive;
     return {
-      symbol: c.symbol, name: c.name, pair: c.pair,
+      symbol: c.symbol, name: c.name, pair: c.pair, local: Boolean(c.local),
       unavailable: a.unavailable,
       ticker: a.ticker,
       hourly: a.hourly,
@@ -182,7 +184,8 @@ function paintDetail() {
     S.detail?.destroy();
     S.detail = null;
     $("view").innerHTML = `<div class="placeholder"><p><a href="#/">‹ Back</a></p>
-      <h2>${fmt.escape(sym)} is not in the coin list</h2><p>Add it in the settings, or check the address.</p></div>`;
+      <h2>${fmt.escape(sym)} is not on your dashboard</h2><p><button class="btn primary" id="add-missing">Look it up and add it</button></p></div>`;
+    $("add-missing").addEventListener("click", () => openAddCoin(sym));
     return;
   }
   if (!S.loaded) return;
@@ -192,6 +195,7 @@ function paintDetail() {
       cfg: S.cfg, feed: S.feed, coin,
       getModel: () => models(S.allCoins).find((x) => x.symbol === coin.symbol),
       getOfficial: () => S.official,
+      onManage: (s) => openAddCoin(s),
     });
   }
   S.detail.update();
@@ -203,6 +207,7 @@ function mountOverview() {
     onSort: (s) => { S.sort = s; store.set("sort", s); paint(); },
     onSearch: (q) => { S.search = q; paint(); },
     onOpen: (sym) => { location.hash = `#/asset/${encodeURIComponent(sym)}`; },
+    onAdd: () => openAddCoin(),
   });
   $("search").value = S.search;
 }
@@ -309,8 +314,13 @@ function openSettings() {
     },
     onTryLocally: (cfg) => { store.set("configOverride", cfg); location.reload(); },
     onDiscardLocal: discardOverride,
-    onSaved: () => { store.set("configOverride", null); },
+    onSaved: (cfg) => { store.set("configOverride", null); coins.rememberSaved(cfg); },
+    onAddCoin: () => { settings.close(); openAddCoin(); },
   });
+}
+
+function openAddCoin(sym = null) {
+  addCoin.open({ cfg: S.cfg, feed: S.feed, overrideActive: S.overrideActive }, sym);
 }
 
 function discardOverride() {
@@ -346,6 +356,12 @@ async function main() {
     } else if (override) {
       store.set("configOverride", null);
     }
+    // Just saved to GitHub: use that copy until GitHub Pages publishes it (about a minute).
+    const pending = S.overrideActive ? null : coins.pendingConfig(S.baseCfg);
+    if (pending) {
+      S.baseCfg = S.cfg = pending;
+      setBanner("pending", "info", "Your change is saved on GitHub. The website publishes it for everyone within a minute or two; this browser shows it already.");
+    }
   } catch (e) {
     setBanner("config", "error", e instanceof ConfigError ? e.message : `Could not start: ${e.message}`);
     $("status-text").textContent = "Error";
@@ -353,7 +369,7 @@ async function main() {
   }
   theme.init(S.cfg);
   theme.onChange(() => S.detail?.applyTheme());
-  S.allCoins = enabledSymbols(S.cfg);
+  S.allCoins = coins.viewCoins(S.cfg);
   applyCoinPrefs();
   tooltip.init(S.cfg, resolveHelp);
   const opts = S.cfg.refresh.options_sec;

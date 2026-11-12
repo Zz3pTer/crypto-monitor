@@ -19,6 +19,7 @@ sys.path.insert(0, str(HERE.parent / "python"))
 
 import config as C  # noqa: E402
 import signals as S  # noqa: E402
+import backtest as B  # noqa: E402
 
 CANDLES = HERE / "fixtures" / "parity_candles.json"
 EXPECTED = HERE / "fixtures" / "expected.json"
@@ -39,6 +40,10 @@ def fetch_candles(cfg: dict) -> dict:
     return out
 
 
+DAY_MS = 86_400_000
+BACKTEST = {"years": 1, "horizons_days": [7, 30], "fee_pct": 0.1}   # 1 year: fits in the 500-day fixture
+
+
 def to_candles(rows: list) -> list[dict]:
     return [{"time": r[0], "open": r[1], "high": r[2], "low": r[3], "close": r[4], "volume": r[5]} for r in rows]
 
@@ -54,8 +59,9 @@ def build_expected(cfg: dict, raw: dict) -> dict:
             "series": [None if d is None else {k: d[k] for k in ("score", "signal", "strong", "votes")} for d in series],
             "last": S.evaluate(candles, sig, previous=prev),
             "indicators": S.compute_indicators(candles, sig),
+            "backtest": B.run_asset([dict(c, close_time=c["time"] + DAY_MS) for c in candles], sig, BACKTEST),
         }
-    return {"signal_config": sig, "assets": out}
+    return {"signal_config": sig, "backtest_config": BACKTEST, "assets": out}
 
 
 def main() -> None:

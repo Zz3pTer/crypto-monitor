@@ -1,4 +1,4 @@
-"""The saved expected results must still match the Python engine.
+r"""The saved expected results must still match the Python engine.
 If this fails after an intended change to the engine, run:
     .venv\Scripts\python tests\make_fixtures.py --offline
 """

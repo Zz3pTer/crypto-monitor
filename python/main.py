@@ -137,6 +137,24 @@ class Job:
         for sym, hist in histories.items():
             self.dirty[self.data_dir / "history" / f"{sym}.json"] = (hist, True)
 
+    def backtest_coin_changes(self) -> None:
+        """A coin added since the weekly backtest gets its backtest now, so the
+        detail screen does not wait until Sunday; removed coins are dropped."""
+        import backtest   # imported here: backtest.py itself imports this module
+        path = self.data_dir / "backtest.json"
+        old = read_json(path, None)
+        have = {a["symbol"] for a in (old or {}).get("assets", [])}
+        enabled = [c["symbol"] for c in C.enabled_symbols(self.cfg)]
+        missing = [s for s in enabled if s not in have]
+        if not missing and have <= set(enabled):
+            return
+        new = backtest.run(self.cfg, missing, fetch=self.fetch, now=self.now) if missing else {"assets": []}
+        out = old or {k: v for k, v in new.items() if k != "assets"}
+        out["assets"] = backtest.merged(self.cfg, old, new["assets"])
+        out["summary"] = backtest.summary(out["assets"])
+        self.dirty[path] = (out, False)
+        self.log(f"backtest: added {', '.join(missing) or 'none'}")
+
     def _history(self, sym: str, candles, series, res) -> list[dict]:
         """data/history/<SYMBOL>.json: one line per day, latest history_keep_days days (FR-HIST-01)."""
         path = self.data_dir / "history" / f"{sym}.json"
@@ -191,6 +209,10 @@ class Job:
                                                    self.state.get("last_report_date")):
             self.daily()
             reported = True
+            try:
+                self.backtest_coin_changes()
+            except Exception as e:   # noqa: BLE001 - never let the backtest spoil the report
+                self.log(f"backtest of new coins failed: {e}")
         if not reported:
             try:
                 self.intraday()

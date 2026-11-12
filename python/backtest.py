@@ -129,6 +129,13 @@ def summary(assets: list[dict]) -> dict:
     return out
 
 
+def merged(cfg: dict, old: dict | None, new_assets: list[dict]) -> list[dict]:
+    """Old results with the new ones on top, in config order; removed coins are dropped."""
+    by = {a["symbol"]: a for a in (old or {}).get("assets") or []}
+    by.update({a["symbol"]: a for a in new_assets})
+    return [by[c["symbol"]] for c in C.enabled_symbols(cfg) if c["symbol"] in by]
+
+
 def run(cfg: dict, only: list[str] | None = None, fetch=fetch_data, now: datetime | None = None) -> dict:
     tz = ZoneInfo(cfg.get("timezone", "Asia/Kuala_Lumpur"))
     now = now or datetime.now(tz)
@@ -171,10 +178,7 @@ def main(argv: list[str] | None = None) -> int:
         print("no coin could be backtested", file=sys.stderr)
         return 1
     if args.symbols:   # partial run: merge into the existing file
-        old = {a["symbol"]: a for a in (read_json(DATA_DIR / "backtest.json", {}).get("assets") or [])}
-        old.update({a["symbol"]: a for a in result["assets"]})
-        order = [c["symbol"] for c in C.enabled_symbols(cfg)]
-        result["assets"] = [old[s] for s in order if s in old]
+        result["assets"] = merged(cfg, read_json(DATA_DIR / "backtest.json", None), result["assets"])
         result["summary"] = summary(result["assets"])
     write_json(DATA_DIR / "backtest.json", result)
     print(f"wrote data/backtest.json in {time.time() - t0:.0f}s")

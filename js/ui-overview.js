@@ -32,7 +32,8 @@ export function mountOverview(view, handlers) {
         <option value="name">Sort: Name (A→Z)</option>
         <option value="custom">Sort: My order (Settings)</option>
       </select>
-      <input class="btn search" id="search" type="search" placeholder="Search symbol…" aria-label="Search symbol" autocomplete="off">
+      <input class="btn search" id="search" type="search" placeholder="Filter my coins…" aria-label="Filter the coins shown" autocomplete="off">
+      <button class="btn primary" id="add-coin" title="Search all coins on Binance and add one">+ Add coin</button>
     </section>
     <section class="grid" id="grid" aria-label="Coins"></section>`;
 
@@ -40,6 +41,7 @@ export function mountOverview(view, handlers) {
   view.querySelectorAll("[data-tab]").forEach((el) => el.addEventListener("click", () => handlers.onFilter(el.dataset.tab)));
   view.querySelector("#sort").addEventListener("change", (e) => handlers.onSort(e.target.value));
   view.querySelector("#search").addEventListener("input", (e) => handlers.onSearch(e.target.value));
+  view.querySelector("#add-coin").addEventListener("click", () => handlers.onAdd());
   view.querySelector("#grid").addEventListener("click", (e) => {
     if (e.target.closest(".help")) return;            // the "?" opens its pop-up, not the card
     const card = e.target.closest(".card[data-sym]");
@@ -62,7 +64,7 @@ export function renderSkeleton(view, n) {
     </div>`).join("");
 }
 
-function sparkline(hourly) {
+export function sparkline(hourly) {
   const pts = hourly.map((c) => c.close);
   if (pts.length < 2) return `<svg class="spark" viewBox="0 0 100 40"></svg>`;
   const min = Math.min(...pts), max = Math.max(...pts), span = max - min || 1;
@@ -91,7 +93,7 @@ export function card(m, th, flash) {
     return `<article class="card" data-sym="${sym}" tabindex="0" aria-label="${sym}: data unavailable">
       <div class="card-top"><span class="sym">${sym}</span><span class="name">${esc(m.name)}</span>
         <span class="badges"><span class="badge none">N/A</span></span></div>
-      <div class="unavailable">Data unavailable — check the pair "${esc(m.pair)}" in config.json.</div></article>`;
+      <div class="unavailable">Data unavailable — "${esc(m.pair)}" did not load from Binance.</div></article>`;
   }
   const t = m.ticker;
   const up = t && t.changePct >= 0;
@@ -99,6 +101,7 @@ export function card(m, th, flash) {
     ? `<span class="badge ${m.signal}${m.strong ? " strong" : ""}">${m.strong ? "STRONG " : ""}${m.signal}</span>`
     : `<span class="badge none">—</span>`;
   const tags = [
+    m.local ? `<span class="tag" title="Added in this browser only: not in the Telegram report">my view</span>` : "",
     m.stale ? `<span class="tag stale">stale</span>` : "",
     m.liveDiffers ? `<span class="tag live-diff" title="Provisional signal on today's open candle">Live: ${m.live.signal} ${fmt.signed(m.live.score)}</span>` : "",
     m.source === "provisional" ? `<span class="tag" title="No official signal yet: shown from today's open candle">provisional</span>` : "",

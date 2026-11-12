@@ -1,6 +1,7 @@
 // Asset detail screen (spec 5.3, FR-UI-04..08, FR-HIST-02/03).
 // Address: #/asset/<SYMBOL>, so it can be bookmarked.
 import * as fmt from "./format.js";
+import { runAsset, settings as btSettings, daysNeeded } from "./backtest.js";
 import * as store from "./store.js";
 import { RULES } from "./signals.js";
 import { help } from "./ui-overview.js";
@@ -89,6 +90,7 @@ function backtestBlock(bt) {
       <tr><td>Following the signals</td><td class="num ${bt.strategy_return_pct >= 0 ? "up" : "down"}">${fmt.pct(bt.strategy_return_pct)}</td></tr>
       <tr><td>Just holding</td><td class="num ${bt.buy_hold_return_pct >= 0 ? "up" : "down"}">${fmt.pct(bt.buy_hold_return_pct)}</td></tr>
     </tbody></table>
+    ${bt.browser ? `<p class="muted">Worked out in your browser${bt.local ? "" : "; the saved backtest follows after the next daily run"}.</p>` : ""}
     <p class="muted">${bt.signal_changes} signal changes, ${bt.trades} trades, in the market ${Math.round(bt.time_in_market_pct)}% of the time. Following the signals did ${beat ? "better" : "worse"} than holding. Past results do not predict future results.</p>`;
 }
 
@@ -122,6 +124,7 @@ export class DetailView {
         <span class="price num" id="d-price">—</span>
         <span class="change num" id="d-change"></span>
         <span class="d-signals" id="d-signals"></span>
+        <button class="btn mini d-manage" id="d-manage" title="Add for everyone, or remove">${c.local ? "My view only · Manage" : "Manage coin"}</button>
       </section>
       <section class="d-toolbar">
         <div class="tabs" role="tablist" aria-label="Timeframe">${TIMEFRAMES.map(([k]) =>
@@ -181,8 +184,22 @@ export class DetailView {
     this._onMq = () => this.buildChart();
     this.mq?.addEventListener?.("change", this._onMq);
 
+    this.view.querySelector("#d-manage").addEventListener("click", () => this.ctx.onManage?.(c.symbol));
     this.loadSideData();
     this.buildChart();
+  }
+
+  // A coin added since the last backtest run: work it out here with the same rules.
+  async browserBacktest() {
+    const cfg = this.ctx.cfg;
+    try {
+      const daily = await this.ctx.feed.klines(this.ctx.coin.pair, "1d", Math.min(daysNeeded(cfg) + 1, 1000));
+      const closed = daily.filter((k) => k.closeTime < Date.now());
+      this.backtest = { ...runAsset(closed, cfg.signal, btSettings(cfg)), browser: true, local: Boolean(this.ctx.coin.local) };
+    } catch {
+      this.backtest = { status: "error", message: "the price history could not be loaded" };
+    }
+    if (this.view.isConnected) this.update();
   }
 
   async loadSideData() {
@@ -197,6 +214,7 @@ export class DetailView {
     this.history = Array.isArray(hist) ? hist : [];
     this.backtest = bt?.assets?.find?.((a) => a.symbol === sym) ?? null;
     this.update();
+    if (!this.backtest) this.browserBacktest();
     this.applyMarkers();
   }
 

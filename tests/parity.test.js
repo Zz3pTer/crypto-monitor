@@ -4,6 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { computeIndicators, evaluate, evaluateSeries } from "../js/signals.js";
+import { runAsset } from "../js/backtest.js";
 
 const read = (f) => JSON.parse(readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8"));
 const expected = read("expected.json");
@@ -30,5 +31,9 @@ for (const symbol of Object.keys(raw).sort()) {
   test(`${symbol}: latest evaluation is identical`, () => {
     const prev = exp.series.at(-2)?.signal ?? null;
     assert.deepEqual(evaluate(candles, sig, prev), exp.last);
+  });
+
+  test(`${symbol}: backtest result is identical`, () => {
+    assert.deepEqual(runAsset(candles, sig, expected.backtest_config), exp.backtest);
   });
 }
