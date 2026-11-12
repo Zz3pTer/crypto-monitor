@@ -65,25 +65,31 @@ function tickLabel(time, type) {
 
 export class PriceChart {
   // phone = true: one indicator pane with RSI/MACD as tabs (spec 5.6)
-  constructor(LWC, el, { phone, overlays, onCrosshair }) {
+  // onView({ from, to, n, user }): the visible candles changed (user = by a gesture).
+  // onNeedOlder(): the user pushed against the oldest loaded candle.
+  constructor(LWC, el, { phone, overlays, onCrosshair, onView, onNeedOlder }) {
     this.L = LWC;
     this.el = el;
     this.phone = phone;
     this.onCrosshair = onCrosshair;
+    this.onView = onView;
+    this.onNeedOlder = onNeedOlder;
+    this.moreOlder = false;             // set by the page: older history can still be loaded
+    el.priceChart = this;               // lets browser tests read the view
+    this._quietUntil = 0;
     this.bars = [];
     this.byTime = new Map();
     this.chart = LWC.createChart(el, {
       autoSize: true,
       ...themeOptions(),
       crosshair: { mode: 0 },
-      // The view is set by the Period buttons only: no dragging or pinching,
-      // so it never shows empty space and a tap never moves it. Touching and
-      // sliding a finger moves the crosshair to read prices; page scrolling
-      // over the chart still works.
-      handleScroll: false,
-      handleScale: false,
-      kineticScroll: { touch: false, mouse: false },
-      trackingMode: { exitMode: 0 },          // crosshair goes when the finger is lifted
+      // Drag to move, pinch or mouse wheel to zoom. Up/down swipes on a phone
+      // still scroll the page. The price axis always fits the candles shown.
+      // Touch and hold, then slide, to read prices (gone when the finger lifts).
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: { time: true, price: false }, axisDoubleClickReset: { time: false, price: true } },
+      kineticScroll: { touch: true, mouse: false },
+      trackingMode: { exitMode: 0 },
       localization: { timeFormatter: (t) => fmt.dateTime(t * 1000) },
       timeScale: { ...themeOptions().timeScale, timeVisible: true, secondsVisible: false, tickMarkFormatter: tickLabel,
         rightOffset: 0, fixLeftEdge: true, fixRightEdge: true, lockVisibleTimeRangeOnResize: true },
@@ -115,7 +121,9 @@ export class PriceChart {
     this.markers = LWC.createSeriesMarkers(this.candles, []);
     this.setOverlays(overlays);
     if (phone) this.showPane("rsi");
-    this.touchScrub(el);
+    el.style.overscrollBehaviorX = "none";      // sideways swipes never trigger the browser's swipe-back
+    this.initEdges(el);
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange((r) => this._onRange(r));
     this.chart.subscribeCrosshairMove((param) => {
       const bar = param.time ? param.seriesData.get(this.candles) : null;
       const full = bar ? this.bars.find((b) => b.time === param.time) : this.bars.at(-1);
@@ -123,27 +131,185 @@ export class PriceChart {
     });
   }
 
-  // Phones: sliding a finger across the chart moves the crosshair at once and
-  // shows that candle's prices. Up/down swipes still scroll the page; sideways
-  // swipes stay on the chart, so they never trigger the browser's swipe-back.
-  touchScrub(el) {
-    el.style.touchAction = "pan-y";
-    el.style.overscrollBehaviorX = "none";
-    const at = (e) => {
-      const t = e.touches?.[0];
-      if (!t) return;
-      const x = t.clientX - el.getBoundingClientRect().left;
-      const time = this.chart.timeScale().coordinateToTime(x);
-      const bar = time === null ? null : this.byTime.get(time);
-      if (!bar) return;
-      this.chart.setCrosshairPosition(bar.close, bar.time, this.candles);
-      this.onCrosshair?.(bar);
+  // ---------- view: which part of the history is on screen ----------
+
+  // A view change counts as the user's while a gesture is going on (and
+  // shortly after, for the glide after a flick), unless the page made it.
+  touched(ms = 1200) {
+    this._userUntil = performance.now() + ms;
+  }
+
+  quiet(fn) {
+    this._quietUntil = performance.now() + 200;
+    fn();
+  }
+
+  visible() {
+    const r = this.chart.timeScale().getVisibleLogicalRange();
+    return r ? { from: r.from, to: r.to, n: this.bars.length } : null;
+  }
+
+  width() { return this.chart.timeScale().width(); }
+
+  atLeft() { const v = this.visible(); return Boolean(v && v.from <= 0.6); }
+  atRight() { const v = this.visible(); return Boolean(v && v.to >= v.n - 1.6); }
+
+  _onRange(r) {
+    if (!r || !this.bars.length) return;
+    const n = this.bars.length;
+    // Safety net: never show space beyond the data, whatever the gesture.
+    if (r.from < -0.6 || r.to > n - 0.4) {
+      const w = Math.min(r.to - r.from, n);
+      const from = r.from < -0.6 ? -0.5 : n - 0.5 - w;
+      this.chart.timeScale().setVisibleLogicalRange({ from, to: from + w });
+      return;
+    }
+    const t = performance.now();
+    const user = t < (this._userUntil ?? 0) && t > this._quietUntil;
+    this.showPill(r, user);
+    if (this._viewFrame) return;
+    this._viewFrame = requestAnimationFrame(() => {
+      this._viewFrame = null;
+      const v = this.visible();
+      if (v) this.onView?.({ ...v, user });
+    });
+  }
+
+  // Shows candles `from` to `to` (indexes into the bars).
+  showBars(from, to) {
+    this.quiet(() => this.chart.timeScale().setVisibleLogicalRange({ from: from - 0.5, to: to + 0.5 }));
+  }
+
+  // Replaces the candles but keeps the same dates on screen. If the view was
+  // at the latest candle it stays there.
+  replaceData(candles, cfg) {
+    const v = this.visible();
+    const old = this.bars;
+    const keepRight = v && v.to >= v.n - 1.6;
+    const t0 = v && old.length ? old[Math.max(0, Math.round(v.from))]?.time : null;
+    const t1 = v && old.length ? old[Math.min(old.length - 1, Math.round(v.to))]?.time : null;
+    this.setData(candles, cfg);
+    if (t0 == null) return;
+    const n = this.bars.length;
+    const idx = (t) => { const i = this.bars.findIndex((b) => b.time >= t); return i < 0 ? n - 1 : i; };
+    if (keepRight) {
+      const w = Math.round(v.to) - Math.round(v.from);
+      this.showBars(Math.max(0, n - 1 - w), n - 1);
+    } else this.showBars(idx(t0), idx(t1));
+  }
+
+  // Shows the dates t0..t1 (seconds), whatever the candle size.
+  showTimes(t0, t1) {
+    const n = this.bars.length;
+    if (!n) return;
+    const first = this.bars.findIndex((b) => b.time >= t0);
+    let last = n - 1;
+    while (last > 0 && this.bars[last].time > t1) last--;
+    this.showBars(Math.max(0, first < 0 ? 0 : first), Math.max(first < 0 ? 0 : first, last));
+  }
+
+  // ---------- edge glow and scroll pill ----------
+
+  initEdges(el) {
+    const mk = (cls, parent = el) => { const d = document.createElement("div"); d.className = cls; parent.appendChild(d); return d; };
+    this.glow = { left: mk("edge-glow left"), right: mk("edge-glow right") };
+    this.pill = mk("scroll-pill");
+    this.pillThumb = mk("thumb", this.pill);
+    this.loadingChip = mk("chart-chip");
+    this.loadingChip.textContent = "Loading older prices…";
+    this.pull = { left: 0, right: 0 };
+    let lastX = null, lastDist = null, mouseDown = false, wheelTimer = null;
+
+    const push = (side, amount) => {
+      if (side === "left" && this.moreOlder) { this.onNeedOlder?.(); return; }
+      this.pull[side] = Math.min(160, this.pull[side] + amount);
+      const k = this.pull[side] / 160;
+      const g = this.glow[side];
+      g.style.transition = "none";
+      g.style.opacity = String(Math.min(1, 0.25 + k));
+      g.style.transform = `scaleX(${0.35 + 0.65 * k})`;
     };
-    el.addEventListener("touchstart", at, { passive: true });
-    el.addEventListener("touchmove", at, { passive: true });
-    const end = () => { this.chart.clearCrosshairPosition(); this.onCrosshair?.(this.bars.at(-1) ?? null); };
-    el.addEventListener("touchend", end);
-    el.addEventListener("touchcancel", end);
+    const release = () => {
+      for (const side of ["left", "right"]) {
+        this.pull[side] = 0;
+        const g = this.glow[side];
+        g.style.transition = "";
+        g.style.opacity = "0";
+        g.style.transform = "scaleX(.35)";
+      }
+    };
+    // A finger or mouse moving right shows older candles; moving left, newer.
+    const moveBy = (dx) => {
+      if (dx > 0 && this.atLeft()) push("left", dx);
+      else if (dx < 0 && this.atRight()) push("right", -dx);
+    };
+    const zoomOutAtFull = (amount) => {
+      if (!(this.atLeft() && this.atRight())) return;
+      push("left", amount);
+      push("right", amount);
+    };
+    // Capture phase: the chart library handles these events itself and may stop them.
+    const on = (target, ev, fn) => target.addEventListener(ev, fn, { passive: true, capture: true });
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+    on(el, "touchstart", (e) => {
+      this.touched();
+      lastX = e.touches.length === 1 ? e.touches[0].clientX : null;
+      lastDist = e.touches.length === 2 ? dist(e.touches) : null;
+    });
+    on(el, "touchmove", (e) => {
+      this.touched();
+      if (e.touches.length === 1 && lastX !== null) {
+        const x = e.touches[0].clientX;
+        moveBy(x - lastX);
+        lastX = x;
+      } else if (e.touches.length === 2) {
+        const d = dist(e.touches);
+        if (lastDist !== null && d < lastDist) zoomOutAtFull((lastDist - d) / 2);
+        lastDist = d;
+      }
+    });
+    for (const ev of ["touchend", "touchcancel"]) on(el, ev, () => { this.touched(1500); lastX = lastDist = null; release(); });
+
+    on(el, "mousedown", (e) => { this.touched(); mouseDown = true; lastX = e.clientX; });
+    this._onMouseMove = (e) => {
+      if (!mouseDown) return;
+      this.touched();
+      moveBy(e.clientX - lastX);
+      lastX = e.clientX;
+    };
+    this._onMouseUp = () => { if (mouseDown) { mouseDown = false; release(); } };
+    window.addEventListener("mousemove", this._onMouseMove);
+    window.addEventListener("mouseup", this._onMouseUp);
+
+    on(el, "wheel", (e) => {
+      this.touched(600);
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) moveBy(-e.deltaX / 2);
+      else if (e.deltaY > 0) zoomOutAtFull(e.deltaY / 4);
+      clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(release, 180);
+    });
+  }
+
+  setLoading(on) {
+    this.loadingChip.classList.toggle("on", Boolean(on));
+  }
+
+  // Thin bar under the dates: where the view is within the loaded history.
+  // Shows while moving and fades out after a moment.
+  showPill(r, user) {
+    const n = this.bars.length;
+    if (!n || !this.pill) return;
+    const from = Math.max(0, r.from + 0.5), to = Math.min(n, r.to + 0.5);
+    const axisW = this.chart.priceScale("right").width() || 60;
+    this.pill.style.right = `${axisW + 4}px`;
+    this.glow.right.style.right = `${axisW}px`;
+    this.pillThumb.style.left = `${(from / n) * 100}%`;
+    this.pillThumb.style.width = `${Math.max(2, ((to - from) / n) * 100)}%`;
+    if (!user) return;
+    this.pill.classList.add("on");
+    clearTimeout(this._pillTimer);
+    this._pillTimer = setTimeout(() => this.pill.classList.remove("on"), 1200);
   }
 
   setData(candles, rsiCfg) {
@@ -233,12 +399,16 @@ export class PriceChart {
     this.candles.applyOptions({ upColor: up, downColor: down, wickUpColor: up, wickDownColor: down });
   }
 
+  // Shows the latest `barsVisible` candles.
   fit(barsVisible = 120) {
     const n = this.bars.length;
-    if (n) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - barsVisible) - 0.5, to: n - 0.5 });
+    if (n) this.showBars(Math.max(0, n - barsVisible), n - 1);
   }
 
   destroy() {
+    window.removeEventListener("mousemove", this._onMouseMove);
+    window.removeEventListener("mouseup", this._onMouseUp);
+    cancelAnimationFrame(this._viewFrame);
     this.chart.remove();
   }
 }

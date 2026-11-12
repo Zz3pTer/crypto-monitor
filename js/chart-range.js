@@ -86,3 +86,45 @@ export function periodChange(candles, start) {
   const first = shown[0], last = shown.at(-1);
   return { from: first.time, to: last.closeTime ?? last.time, changePct: first.open ? ((last.close - first.open) / first.open) * 100 : null, bars: shown.length };
 }
+
+// ---------- free zooming (pinch / mouse wheel) ----------
+
+export const ZOOM_IN_BARS = 20;       // fewer candles than this on screen while zooming in: smaller candles
+// Zooming out: bigger candles once they are packed closer than 1.5 px (at
+// least 150 on screen, so the next size never lands below ZOOM_IN_BARS).
+export const zoomOutBars = (widthPx) => Math.max(150, Math.round(widthPx / 1.5));
+export const MAX_LOADED = 10_000;     // most candles kept after loading older history
+
+// The candle size to use after the user zoomed. `growing`: more candles are
+// on screen than before (zooming out); `widthPx`: the chart's width. Smaller
+// candles are only used when the history from `startMs` to now fits in one load.
+export function nextInterval(key, visibleBars, growing, startMs, widthPx, now = Date.now()) {
+  const i = INTERVALS.findIndex((x) => x.key === key);
+  if (growing && visibleBars > zoomOutBars(widthPx) && i < INTERVALS.length - 1) return INTERVALS[i + 1].key;
+  if (!growing && visibleBars < ZOOM_IN_BARS && i > 0) {
+    const finer = INTERVALS[i - 1];
+    if (Math.ceil((now - startMs) / finer.ms) + WARMUP <= MAX_BARS) return finer.key;
+  }
+  return key;
+}
+
+// Candles of this size needed to show from `startMs` up to now, with warm-up.
+export const barsSince = (startMs, intervalKey, now = Date.now()) =>
+  Math.ceil((now - startMs) / intervalOf(intervalKey).ms) + WARMUP + 1;
+
+// Joins two candle lists (later ones win for the same time), oldest first.
+export function mergeBars(a, b) {
+  const m = new Map(a.map((c) => [c.time, c]));
+  for (const c of b) m.set(c.time, c);
+  return [...m.values()].sort((x, y) => x.time - y.time);
+}
+
+// Index of the last candle that starts at or before `t` (0 if none).
+export function indexAt(bars, t) {
+  let lo = 0, hi = bars.length - 1, ans = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (bars[mid].time <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans;
+}

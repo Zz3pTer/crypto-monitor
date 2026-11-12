@@ -107,6 +107,9 @@ export class DetailView {
     this.paneTab = "rsi";
     this.mode = null;                            // "official" | "live" (breakdown shown)
     this.tfBars = null;
+    this.gen = 0;                                // load counter: only the newest answer is used
+    this.busy = false;
+    this.moreOlder = false;
     this.tfLoadedAt = 0;
     this.history = null;
     this.backtest = null;
@@ -241,7 +244,10 @@ export class DetailView {
     }
     if (!this.view.isConnected) return;
     box.querySelector("#chart-msg")?.remove();
-    this.chart = new PriceChart(L, box, { phone, overlays: this.overlays, onCrosshair: (b) => this.legend(b) });
+    this.chart = new PriceChart(L, box, {
+      phone, overlays: this.overlays, onCrosshair: (b) => this.legend(b),
+      onView: (v) => this.onView(v), onNeedOlder: () => this.loadOlder(),
+    });
     if (phone) this.chart.showPane(this.paneTab);
     const p = this.ctx.cfg.signal.periods;
     const rsiLabel = `RSI (${p.rsi}) ${help("RSI")}`;
@@ -250,16 +256,33 @@ export class DetailView {
     this.chart?.setPaneLabels(phone ? [] : [rsiLabel, macdLabel]);
   }
 
-  // Highlights the chosen period and candle size; greys out candle sizes
-  // that give too few or too many candles for the period.
+  // Highlights the chosen period (none after free zooming) and candle size;
+  // greys out candle sizes that give too few or too many candles.
   tfButtons() {
     this.view.querySelectorAll("[data-range]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === this.range)));
     this.view.querySelectorAll("[data-tf]").forEach((b) => {
-      const why = R.whyNot(this.range, b.dataset.tf);
+      const why = this.whyNotTf(b.dataset.tf);
       b.setAttribute("aria-pressed", String(b.dataset.tf === this.tf));
       b.disabled = Boolean(why);
       b.title = why || `${R.intervalOf(b.dataset.tf).name} candles`;
     });
+  }
+
+  // Dates on screen (ms), or null.
+  visibleTimes() {
+    const v = this.chart?.visible(), bars = this.tfBars;
+    if (!v || !bars?.length) return null;
+    const a = bars[Math.max(0, Math.min(bars.length - 1, Math.round(v.from)))];
+    const b = bars[Math.max(0, Math.min(bars.length - 1, Math.round(v.to)))];
+    return { t0: a.time, t1: b.time, a, b };
+  }
+
+  whyNotTf(key) {
+    if (this.range) return R.whyNot(this.range, key);
+    const vt = this.visibleTimes();
+    if (!vt) return "";
+    if ((vt.t1 - vt.t0) / R.intervalOf(key).ms < 2) return "Too few candles for what is shown";
+    return R.barsSince(vt.t0, key) > R.MAX_BARS ? "Too many candles for what is shown" : "";
   }
 
   async setRange(range) {
@@ -272,36 +295,144 @@ export class DetailView {
   }
 
   async setTf(tf) {
-    if (!R.allowed(this.range, tf)) return;
+    if (this.whyNotTf(tf)) return;
+    if (!this.range) { await this.switchInterval(tf); return; }     // after free zooming: keep the same dates
     this.tf = tf;
     store.set("detailTf", tf);
     this.tfButtons();
     await this.loadTf(true);
   }
 
-  // Loads the candles and shows exactly the chosen period. `user`: started by
-  // a button, so "Loading…" is shown meanwhile.
+  // Loads the candles for the chosen period and shows exactly that period.
+  // `user`: started by a button, so "Loading…" is shown meanwhile.
   async loadTf(user = false) {
     if (!this.chart) return;
+    const gen = ++this.gen;
     const tf = this.tf, range = this.range;
     const iv = R.intervalOf(tf);
     const title = this.view.querySelector("#chart-title");
     if (user) title.textContent = "Loading…";
     try {
-      const bars = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, R.barsToLoad(range, tf));
-      if (tf !== this.tf || range !== this.range || !this.chart) return;   // the user switched while loading
-      this.tfBars = bars;
-      this.tfLoadedAt = Date.now();
+      const want = R.barsToLoad(range, tf);
+      const bars = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, want);
+      if (gen !== this.gen || !this.chart) return;          // something newer was asked for meanwhile
+      this.setBars(bars, want);
       this.chart.setData(bars, this.ctx.cfg.signal);
-      const start = R.rangeStart(range);
-      const p = R.periodChange(bars, start);
+      const p = R.periodChange(bars, R.rangeStart(range));
       this.shownBars = p ? p.bars : bars.length;
       this.chart.fit(this.shownBars);
       this.applyMarkers();
-      title.innerHTML = p ? this.periodTitle(p, start, iv) : `Price (${iv.name} candles, MYT)`;
+      this.updateTitle();
     } catch (e) {
-      title.textContent = `Price — could not load ${iv.name} candles (${e.message})`;
+      if (gen === this.gen) title.textContent = `Price — could not load ${iv.name} candles (${e.message})`;
     }
+  }
+
+  setBars(bars, asked) {
+    this.tfBars = bars;
+    this.tfLoadedAt = Date.now();
+    this.moreOlder = bars.length >= asked && bars.length < R.MAX_LOADED;   // a full answer: there may be older candles
+    if (this.chart) this.chart.moreOlder = this.moreOlder;
+  }
+
+  // The view moved (gesture, or the page itself).
+  onView(v) {
+    const shown = v.to - v.from;
+    const before = this.visibleBars ?? shown;
+    this.visibleBars = shown;
+    if ((shown > 120) !== (before > 120)) this.applyMarkers();
+    if (!v.user) return;
+    if (this.range) { this.range = null; this.tfButtons(); }      // free zooming: no period button is lit
+    this.updateTitle();
+    if (v.from < 8 && this.moreOlder) this.loadOlder();
+    if (this.busy || Math.abs(shown - before) < 0.5) return;
+    const vt = this.visibleTimes();
+    const next = vt && R.nextInterval(this.tf, shown, shown > before, vt.t0, this.chart.width());
+    if (next && next !== this.tf) this.switchInterval(next);
+    else this.tfButtons();
+  }
+
+  // Changes the candle size but keeps the same dates on screen.
+  async switchInterval(key) {
+    const vt = this.visibleTimes();
+    if (!vt || this.busy) return;
+    const want = Math.min(R.barsSince(vt.t0, key), R.MAX_BARS);
+    const atLatest = this.chart.atRight();
+    const end = atLatest ? Infinity : (vt.b.closeTime ?? vt.t1);
+    this.busy = true;
+    const gen = ++this.gen;
+    try {
+      const bars = await this.ctx.feed.klines(this.ctx.coin.pair, R.intervalOf(key).api, want);
+      if (gen !== this.gen || !this.chart) return;
+      this.tf = key;
+      store.set("detailTf", key);
+      this.setBars(bars, want);
+      this.chart.setData(bars, this.ctx.cfg.signal);
+      this.chart.showTimes(vt.t0 / 1000, end / 1000);      // the same dates; still at the latest candle if it was
+      this.tfButtons();
+      this.applyMarkers();
+      this.updateTitle();
+    } catch { /* keep the current candles */ } finally {
+      this.busy = false;
+    }
+  }
+
+  // The user reached the oldest loaded candle: load up to 1000 older ones.
+  async loadOlder() {
+    if (this.busy || !this.moreOlder || !this.tfBars?.length) return;
+    this.busy = true;
+    this.chart.setLoading(true);
+    const gen = ++this.gen;
+    try {
+      const iv = R.intervalOf(this.tf);
+      const older = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, 1000, this.tfBars[0].time - 1);
+      if (gen !== this.gen || !this.chart) return;
+      const merged = R.mergeBars(older, this.tfBars);
+      this.tfBars = merged;
+      this.moreOlder = older.length >= 1000 && merged.length < R.MAX_LOADED;
+      this.chart.moreOlder = this.moreOlder;
+      this.chart.replaceData(merged, this.ctx.cfg.signal);
+      this.applyMarkers();
+      this.updateTitle();
+    } catch { /* try again on the next push */ } finally {
+      this.busy = false;
+      this.chart?.setLoading(false);
+    }
+  }
+
+  // Every few minutes: fetch the latest candles and add them, keeping the view.
+  async refreshLatest() {
+    if (this.busy || !this.tfBars?.length) return;
+    this.tfLoadedAt = Date.now();
+    const gen = this.gen;
+    try {
+      const latest = await this.ctx.feed.klines(this.ctx.coin.pair, R.intervalOf(this.tf).api, 3);
+      if (gen !== this.gen || !this.chart) return;
+      this.tfBars = R.mergeBars(this.tfBars, latest);
+      this.chart.replaceData(this.tfBars, this.ctx.cfg.signal);
+      this.applyMarkers();
+      this.updateTitle();
+    } catch { /* next time */ }
+  }
+
+  updateTitle() {
+    const title = this.view.querySelector("#chart-title");
+    const iv = R.intervalOf(this.tf);
+    if (!this.tfBars?.length) return;
+    if (this.range) {
+      const start = R.rangeStart(this.range);
+      const p = R.periodChange(this.tfBars, start);
+      title.innerHTML = p ? this.periodTitle(p, start, iv) : `Price (${iv.name} candles, MYT)`;
+      return;
+    }
+    const vt = this.visibleTimes();
+    if (!vt) return;
+    const pct = vt.a.open ? ((vt.b.close - vt.a.open) / vt.a.open) * 100 : null;
+    const end = Math.min(vt.b.closeTime ?? vt.t1, Date.now());
+    const short = end - vt.t0 < 3 * DAY_MS;
+    const dates = `${short ? fmt.dateTime(vt.t0) : fmt.date(vt.t0)} – ${end >= Date.now() - iv.ms ? "now" : short ? fmt.dateTime(end) : fmt.date(end)}`;
+    const ch = pct === null ? "" : ` · <span class="num ${pct >= 0 ? "up" : "down"}">${pct >= 0 ? "▲" : "▼"} ${fmt.pct(pct)}</span>`;
+    title.innerHTML = `Price · ${esc(dates)}${ch} · ${iv.name} candles, MYT`;
   }
 
   // "1 year · 12 Nov 2025 – 12 Nov 2026 · ▲ +40.2% · daily candles, MYT"
@@ -330,7 +461,7 @@ export class DetailView {
         position: h.signal === "SELL" ? "aboveBar" : "belowBar",
         shape: h.signal === "BUY" ? "arrowUp" : h.signal === "SELL" ? "arrowDown" : "circle",
         color: getComputedStyle(document.documentElement).getPropertyValue(color.slice(4, -1)).trim(),
-        text: (this.shownBars ?? 0) > 120 ? "" : h.signal,      // long periods: arrows only, words would overlap
+        text: (this.visibleBars ?? this.shownBars ?? 0) > 120 ? "" : h.signal,   // many candles: arrows only, words would overlap
       });
     }
     this.chart.setMarkers(marks);
@@ -393,17 +524,14 @@ export class DetailView {
 
     // Chart: move the last candle with the live price; reload candles every few minutes.
     if (this.chart && this.tfBars) {
-      if (Date.now() - this.tfLoadedAt > TF_RELOAD_MS) this.loadTf(false);
+      if (Date.now() - this.tfLoadedAt > TF_RELOAD_MS) this.refreshLatest();
       else this.chart.updateLast(m.livePrice);
     }
   }
 
   applyTheme() {
     this.chart?.applyTheme();
-    if (this.tfBars) {
-      this.chart?.setData(this.tfBars, this.ctx.cfg.signal);
-      this.chart?.fit(this.shownBars ?? this.tfBars.length);
-    }
+    if (this.tfBars) this.chart?.replaceData(this.tfBars, this.ctx.cfg.signal);
     this.applyMarkers();
   }
 

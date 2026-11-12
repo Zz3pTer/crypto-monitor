@@ -360,7 +360,22 @@ main { padding: 16px 24px 24px; flex: 1; width: 100%; max-width: 1600px; margin:
 .chart-title { color: var(--label); margin: 0 0 4px 4px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--label); margin: 0 0 6px 4px; min-height: 18px; }
 .legend b { color: var(--text); font-weight: 600; }
-.chart-box { height: 640px; position: relative; }
+.chart-box { height: 640px; position: relative; overflow: hidden; touch-action: pan-y; overscroll-behavior-x: none; }
+/* Glow at the edge when the chart is pushed past its first or latest candle (like Android lists). */
+.edge-glow { position: absolute; top: 0; bottom: 28px; width: 56px; z-index: 4; pointer-events: none; opacity: 0;
+  transform: scaleX(.35); transition: opacity .45s ease-out, transform .45s ease-out; }
+.edge-glow.left { left: 0; transform-origin: left center;
+  background: radial-gradient(ellipse 100% 60% at 0% 50%, color-mix(in srgb, var(--accent) 55%, transparent), transparent 75%); }
+.edge-glow.right { right: 64px; transform-origin: right center;
+  background: radial-gradient(ellipse 100% 60% at 100% 50%, color-mix(in srgb, var(--accent) 55%, transparent), transparent 75%); }
+/* Scroll pill under the dates: where the view is within the loaded history. */
+.scroll-pill { position: absolute; left: 4px; bottom: 1px; height: 4px; z-index: 4; pointer-events: none; border-radius: 2px;
+  background: color-mix(in srgb, var(--label) 18%, transparent); opacity: 0; transition: opacity .5s; }
+.scroll-pill.on { opacity: 1; transition: opacity .1s; }
+.scroll-pill .thumb { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: var(--label); }
+.chart-chip { position: absolute; left: 8px; top: 8px; z-index: 5; pointer-events: none; font-size: 12px; padding: 3px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 90%, transparent); border: 1px solid var(--border); color: var(--label); display: none; }
+.chart-chip.on { display: block; }
 .chart-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--label); text-align: center; padding: 16px; }
 .pane-label { position: absolute; left: 6px; top: 4px; z-index: 3; white-space: nowrap; color: var(--label); font-size: 12px;
   background: color-mix(in srgb, var(--card) 85%, transparent); padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; }

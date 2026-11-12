@@ -87,3 +87,38 @@ test("long periods are fetched from Binance in parts", async () => {
   assert.equal((await feed.klines("XUSDT", "1h", 300)).length, 300);
   assert.deepEqual(asks, [300]);
 });
+
+test("zooming far out switches to bigger candles, zooming far in to smaller ones", () => {
+  const yearAgo = now - 365 * 86_400_000, weekAgo = now - 7 * 86_400_000;
+  const desk = 1100, phone = 290;                                     // chart widths in px
+  assert.equal(R.zoomOutBars(desk), 733);
+  assert.equal(R.zoomOutBars(phone), 193);
+  assert.equal(R.nextInterval("1D", 750, true, yearAgo, desk, now), "1W");
+  assert.equal(R.nextInterval("1D", 200, true, yearAgo, phone, now), "1W");   // a phone switches sooner
+  assert.equal(R.nextInterval("1D", 200, true, yearAgo, desk, now), "1D");
+  assert.equal(R.nextInterval("1D", 750, false, yearAgo, desk, now), "1D");   // only while zooming out
+  assert.equal(R.nextInterval("1W", 900, true, yearAgo, desk, now), "1W");    // no bigger size
+  assert.equal(R.nextInterval("1D", 15, false, weekAgo, desk, now), "4H");
+  assert.equal(R.nextInterval("1H", 10, false, weekAgo, desk, now), "1H");    // no smaller size
+  // zoomed in on 2019: hourly candles from then to now would be far too many
+  assert.equal(R.nextInterval("4H", 15, false, now - 7 * 365 * 86_400_000, desk, now), "4H");
+  // a switch never flips straight back: the new count lands between the limits
+  for (const w of [phone, desk, 2000]) {
+    for (const [a, b] of [["1H", "4H"], ["4H", "1D"], ["1D", "1W"]]) {
+      const ratio = R.intervalOf(b).ms / R.intervalOf(a).ms;
+      assert.ok((R.zoomOutBars(w) + 1) / ratio > R.ZOOM_IN_BARS, `${a}->${b} at ${w}px`);
+      assert.ok(R.ZOOM_IN_BARS * ratio < R.zoomOutBars(w), `${b}->${a} at ${w}px`);
+    }
+  }
+});
+
+test("older candles are joined to the loaded ones in order, nothing twice", () => {
+  const c = (t, close = 1) => ({ time: t, close });
+  const m = R.mergeBars([c(1), c(2), c(3)], [c(3, 9), c(4)]);
+  assert.deepEqual(m.map((x) => x.time), [1, 2, 3, 4]);
+  assert.equal(m[2].close, 9);
+  assert.equal(R.indexAt(m, 2.5), 1);
+  assert.equal(R.indexAt(m, 0), 0);
+  assert.equal(R.indexAt(m, 99), 3);
+  assert.equal(R.barsSince(now - 10 * 86_400_000, "1D", now), 10 + R.WARMUP + 1);
+});
