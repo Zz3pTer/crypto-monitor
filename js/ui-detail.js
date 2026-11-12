@@ -279,12 +279,14 @@ export class DetailView {
     await this.loadTf(true);
   }
 
-  async loadTf(fit = false) {
+  // Loads the candles and shows exactly the chosen period. `user`: started by
+  // a button, so "Loading…" is shown meanwhile.
+  async loadTf(user = false) {
     if (!this.chart) return;
     const tf = this.tf, range = this.range;
     const iv = R.intervalOf(tf);
     const title = this.view.querySelector("#chart-title");
-    if (fit) title.textContent = "Loading…";
+    if (user) title.textContent = "Loading…";
     try {
       const bars = await this.ctx.feed.klines(this.ctx.coin.pair, iv.api, R.barsToLoad(range, tf));
       if (tf !== this.tf || range !== this.range || !this.chart) return;   // the user switched while loading
@@ -293,7 +295,8 @@ export class DetailView {
       this.chart.setData(bars, this.ctx.cfg.signal);
       const start = R.rangeStart(range);
       const p = R.periodChange(bars, start);
-      if (fit) this.chart.fit(p ? p.bars : bars.length);
+      this.shownBars = p ? p.bars : bars.length;
+      this.chart.fit(this.shownBars);
       this.applyMarkers();
       title.innerHTML = p ? this.periodTitle(p, start, iv) : `Price (${iv.name} candles, MYT)`;
     } catch (e) {
@@ -327,7 +330,7 @@ export class DetailView {
         position: h.signal === "SELL" ? "aboveBar" : "belowBar",
         shape: h.signal === "BUY" ? "arrowUp" : h.signal === "SELL" ? "arrowDown" : "circle",
         color: getComputedStyle(document.documentElement).getPropertyValue(color.slice(4, -1)).trim(),
-        text: h.signal,
+        text: (this.shownBars ?? 0) > 120 ? "" : h.signal,      // long periods: arrows only, words would overlap
       });
     }
     this.chart.setMarkers(marks);
@@ -397,7 +400,10 @@ export class DetailView {
 
   applyTheme() {
     this.chart?.applyTheme();
-    if (this.tfBars) this.chart?.setData(this.tfBars, this.ctx.cfg.signal);
+    if (this.tfBars) {
+      this.chart?.setData(this.tfBars, this.ctx.cfg.signal);
+      this.chart?.fit(this.shownBars ?? this.tfBars.length);
+    }
     this.applyMarkers();
   }
 

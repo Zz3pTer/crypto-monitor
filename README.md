@@ -24,7 +24,7 @@ Market data: Binance public market-data service (`data-api.binance.vision`, `dat
 
 All times are Malaysia time (MYT, UTC+8). The daily candle closes at 08:00 MYT.
 
-**Chart on a coin's page.** *Period* (1D, 1W, 1M, 3M, 6M, YTD, 1Y, 5Y, All) picks the dates shown, ending now: 1Y on 12 Nov 2026 shows 12 Nov 2025 – 12 Nov 2026, with the price change over that time. *Candles* (1h, 4h, 1d, 1w) picks the candle size; a sensible one is chosen with each period, and sizes that would give fewer than 2 or more than about 3,800 candles are greyed out. A coin younger than the period is shown from its first day on Binance. The chart only changes what you see: the signal always uses daily candles.
+**Chart on a coin's page.** *Period* (1D, 1W, 1M, 3M, 6M, YTD, 1Y, 5Y, All) picks the dates shown, ending now: 1Y on 12 Nov 2026 shows 12 Nov 2025 – 12 Nov 2026, with the price change over that time. *Candles* (1h, 4h, 1d, 1w) picks the candle size; a sensible one is chosen with each period, and sizes that would give fewer than 2 or more than about 3,800 candles are greyed out. A coin younger than the period is shown from its first day on Binance. The chart cannot be dragged or pinched, so it always shows exactly the chosen period; point at it (or slide a finger across it on a phone) to read a candle's prices. The chart only changes what you see: the signal always uses daily candles.
 
 ---
 

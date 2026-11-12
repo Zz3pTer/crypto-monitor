@@ -71,15 +71,22 @@ export class PriceChart {
     this.phone = phone;
     this.onCrosshair = onCrosshair;
     this.bars = [];
+    this.byTime = new Map();
     this.chart = LWC.createChart(el, {
       autoSize: true,
       ...themeOptions(),
       crosshair: { mode: 0 },
+      // The view is set by the Period buttons only: no dragging or pinching,
+      // so it never shows empty space and a tap never moves it. Touching and
+      // sliding a finger moves the crosshair to read prices; page scrolling
+      // over the chart still works.
+      handleScroll: false,
+      handleScale: false,
+      kineticScroll: { touch: false, mouse: false },
+      trackingMode: { exitMode: 0 },          // crosshair goes when the finger is lifted
       localization: { timeFormatter: (t) => fmt.dateTime(t * 1000) },
-      // fixLeftEdge / fixRightEdge: the chart cannot be scrolled or pinched out
-      // past the first or the latest candle, so no empty space is shown.
       timeScale: { ...themeOptions().timeScale, timeVisible: true, secondsVisible: false, tickMarkFormatter: tickLabel,
-        rightOffset: 0, fixLeftEdge: true, fixRightEdge: true },
+        rightOffset: 0, fixLeftEdge: true, fixRightEdge: true, lockVisibleTimeRangeOnResize: true },
     });
     const up = css("--buy"), down = css("--sell");
     this.candles = this.chart.addSeries(LWC.CandlestickSeries, {
@@ -108,11 +115,35 @@ export class PriceChart {
     this.markers = LWC.createSeriesMarkers(this.candles, []);
     this.setOverlays(overlays);
     if (phone) this.showPane("rsi");
+    this.touchScrub(el);
     this.chart.subscribeCrosshairMove((param) => {
       const bar = param.time ? param.seriesData.get(this.candles) : null;
       const full = bar ? this.bars.find((b) => b.time === param.time) : this.bars.at(-1);
       this.onCrosshair?.(full ?? null);
     });
+  }
+
+  // Phones: sliding a finger across the chart moves the crosshair at once and
+  // shows that candle's prices. Up/down swipes still scroll the page; sideways
+  // swipes stay on the chart, so they never trigger the browser's swipe-back.
+  touchScrub(el) {
+    el.style.touchAction = "pan-y";
+    el.style.overscrollBehaviorX = "none";
+    const at = (e) => {
+      const t = e.touches?.[0];
+      if (!t) return;
+      const x = t.clientX - el.getBoundingClientRect().left;
+      const time = this.chart.timeScale().coordinateToTime(x);
+      const bar = time === null ? null : this.byTime.get(time);
+      if (!bar) return;
+      this.chart.setCrosshairPosition(bar.close, bar.time, this.candles);
+      this.onCrosshair?.(bar);
+    };
+    el.addEventListener("touchstart", at, { passive: true });
+    el.addEventListener("touchmove", at, { passive: true });
+    const end = () => { this.chart.clearCrosshairPosition(); this.onCrosshair?.(this.bars.at(-1) ?? null); };
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
   }
 
   setData(candles, rsiCfg) {
@@ -121,6 +152,7 @@ export class PriceChart {
     const prec = precisionFor(last);
     this.candles.applyOptions({ priceFormat: { type: "price", precision: prec, minMove: 1 / 10 ** prec } });
     this.candles.setData(this.bars);
+    this.byTime = new Map(this.bars.map((b) => [b.time, b]));
     const closes = candles.map((c) => c.close);
     const times = this.bars.map((b) => b.time);
     const toLine = (vals) => vals.flatMap((v, i) => (v === null ? [] : [{ time: times[i], value: v }]));
