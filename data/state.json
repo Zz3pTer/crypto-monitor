@@ -12,11 +12,11 @@
     "ETH": "HOLD",
     "SOL": "HOLD",
     "ADA": "HOLD",
-    "XLM": "SELL",
+    "XLM": "HOLD",
     "XRP": "HOLD",
     "ALGO": "SELL",
     "HBAR": "HOLD",
-    "LINK": "SELL"
+    "LINK": "HOLD"
   },
   "last_report_date": "2026-11-14"
 }
