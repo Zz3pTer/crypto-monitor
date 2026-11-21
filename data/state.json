@@ -4,7 +4,7 @@
       "armed": true
     },
     "BTC:below:60000": {
-      "armed": true
+      "armed": false
     }
   },
   "live_signals": {
@@ -18,5 +18,5 @@
     "HBAR": "SELL",
     "LINK": "HOLD"
   },
-  "last_report_date": "2026-11-20"
+  "last_report_date": "2026-11-21"
 }
