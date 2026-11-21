@@ -13,9 +13,9 @@
     "SOL": "HOLD",
     "ADA": "HOLD",
     "XLM": "SELL",
-    "XRP": "SELL",
+    "XRP": "HOLD",
     "ALGO": "HOLD",
-    "HBAR": "SELL",
+    "HBAR": "HOLD",
     "LINK": "HOLD"
   },
   "last_report_date": "2026-11-21"
