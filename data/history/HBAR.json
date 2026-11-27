@@ -193,5 +193,6 @@
 {"date": "2026-11-23", "close": 0.05161, "score": -30, "signal": "SELL"},
 {"date": "2026-11-24", "close": 0.05251, "score": -30, "signal": "SELL"},
 {"date": "2026-11-25", "close": 0.05036, "score": -30, "signal": "SELL"},
-{"date": "2026-11-26", "close": 0.05216, "score": -30, "signal": "SELL"}
+{"date": "2026-11-26", "close": 0.05216, "score": -30, "signal": "SELL"},
+{"date": "2026-11-27", "close": 0.05399, "score": -25, "signal": "HOLD"}
 ]
